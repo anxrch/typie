@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { random } from '@ctrl/tinycolor';
-  import stringHash from '@sindresorhus/string-hash';
   import { isiOS, isMacOS } from '@tiptap/core';
   import { css } from '@typie/styled-system/css';
   import { center } from '@typie/styled-system/patterns';
@@ -13,7 +11,6 @@
   import { onMount, tick, untrack } from 'svelte';
   import { match } from 'ts-pattern';
   import { IndexeddbPersistence } from 'y-indexeddb';
-  import * as YAwareness from 'y-protocols/awareness';
   import * as Y from 'yjs';
   import { CanvasSyncType } from '@/enums';
   import ElipsisIcon from '~icons/lucide/ellipsis';
@@ -31,8 +28,6 @@
   import Toolbar from './Toolbar.svelte';
   import Zoom from './Zoom.svelte';
   import type { Canvas_query } from '$graphql';
-
-  const DISCONNECT_THRESHOLD = 3;
 
   type Props = {
     $query: Canvas_query;
@@ -90,16 +85,6 @@
     }
   `);
 
-  const canvasSyncStream = graphql(`
-    subscription DashboardSlugPage_Canvas_CanvasSyncStream_Subscription($clientId: String!, $canvasId: ID!) {
-      canvasSyncStream(clientId: $clientId, canvasId: $canvasId) {
-        canvasId
-        type
-        data
-      }
-    }
-  `);
-
   const app = getAppContext();
   const theme = getThemeContext();
   const splitViewId = getViewContext().id;
@@ -124,11 +109,7 @@
 
   let canvas = $state<Canvas>();
 
-  let connectionStatus = $state<'connecting' | 'connected' | 'disconnected'>('connecting');
-  let lastHeartbeatAt = $state(dayjs());
-
   const doc = new Y.Doc();
-  const awareness = new YAwareness.Awareness(doc);
 
   const title = new YState<string>(doc, 'title', '');
   const effectiveTitle = $derived(title.current || '(제목 없음)');
@@ -137,174 +118,29 @@
   let titleEditing = $state(false);
   let titleEditingText = $state('');
 
-  let syncUpdateTimeout: NodeJS.Timeout | null = null;
-  let pendingUpdate: Uint8Array | null = null;
-
-  doc.on('updateV2', async (update, origin) => {
-    if (browser && origin !== 'remote' && canvasId) {
-      if (pendingUpdate) {
-        pendingUpdate = Y.mergeUpdatesV2([pendingUpdate, update]);
-      } else {
-        pendingUpdate = update;
-      }
-
-      if (syncUpdateTimeout) {
-        clearTimeout(syncUpdateTimeout);
-      }
-
-      syncUpdateTimeout = setTimeout(async () => {
-        if (pendingUpdate && canvasId) {
-          await syncCanvas(
-            {
-              clientId,
-              canvasId,
-              type: CanvasSyncType.UPDATE,
-              data: pendingUpdate.toBase64(),
-            },
-            { transport: 'ws' },
-          );
-
-          pendingUpdate = null;
-        }
-      }, 1000);
-    }
-  });
-
-  let syncAwarenessTimeout: NodeJS.Timeout | null = null;
-  let pendingAwarenessStates: { added: number[]; updated: number[]; removed: number[] } | null = null;
-
-  awareness.on('update', async (states: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
-    if (browser && origin !== 'remote' && canvasId) {
-      if (pendingAwarenessStates) {
-        pendingAwarenessStates = {
-          added: [...new Set([...pendingAwarenessStates.added, ...states.added])],
-          updated: [...new Set([...pendingAwarenessStates.updated, ...states.updated])],
-          removed: [...new Set([...pendingAwarenessStates.removed, ...states.removed])],
-        };
-      } else {
-        pendingAwarenessStates = states;
-      }
-
-      if (syncAwarenessTimeout) {
-        clearTimeout(syncAwarenessTimeout);
-      }
-
-      syncAwarenessTimeout = setTimeout(async () => {
-        if (pendingAwarenessStates && canvasId) {
-          const update = YAwareness.encodeAwarenessUpdate(awareness, [
-            ...pendingAwarenessStates.added,
-            ...pendingAwarenessStates.updated,
-            ...pendingAwarenessStates.removed,
-          ]);
-
-          await syncCanvas(
-            {
-              clientId,
-              canvasId,
-              type: CanvasSyncType.AWARENESS,
-              data: update.toBase64(),
-            },
-            { transport: 'ws' },
-          );
-
-          pendingAwarenessStates = null;
-        }
-      }, 1000);
-    }
-  });
-
-  const forceSync = async () => {
+  const fullSync = async () => {
     if (!canvasId) return;
 
-    const vector = Y.encodeStateVector(doc);
+    const update = Y.encodeStateAsUpdateV2(doc);
 
-    await syncCanvas(
-      {
-        clientId,
-        canvasId,
-        type: CanvasSyncType.VECTOR,
-        data: vector.toBase64(),
-      },
-      { transport: 'ws' },
-    );
+    await syncCanvas({
+      clientId,
+      canvasId,
+      type: CanvasSyncType.UPDATE,
+      data: update.toBase64(),
+    });
   };
 
   onMount(() => {
     if (!canvasId) return;
 
-    const handleOnline = () => {
-      const isFresh = dayjs().diff(lastHeartbeatAt, 'seconds') <= DISCONNECT_THRESHOLD;
-      if (isFresh) {
-        connectionStatus = 'connected';
-      } else {
-        connectionStatus = 'connecting';
-      }
-    };
-
-    const handleOffline = () => {
-      connectionStatus = 'disconnected';
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    if (!navigator.onLine) {
-      connectionStatus = 'disconnected';
-    }
-
-    const unsubscribe = canvasSyncStream.subscribe({ clientId, canvasId }, async (payload) => {
-      if (payload.type === CanvasSyncType.HEARTBEAT) {
-        lastHeartbeatAt = dayjs(payload.data);
-        connectionStatus = 'connected';
-      } else if (payload.type === CanvasSyncType.UPDATE) {
-        Y.applyUpdateV2(doc, Uint8Array.fromBase64(payload.data), 'remote');
-      } else if (payload.type === CanvasSyncType.VECTOR) {
-        const update = Y.encodeStateAsUpdateV2(doc, Uint8Array.fromBase64(payload.data));
-
-        await syncCanvas(
-          {
-            clientId,
-            canvasId,
-            type: CanvasSyncType.UPDATE,
-            data: update.toBase64(),
-          },
-          { transport: 'ws' },
-        );
-      } else if (payload.type === CanvasSyncType.AWARENESS) {
-        YAwareness.applyAwarenessUpdate(awareness, Uint8Array.fromBase64(payload.data), 'remote');
-      } else if (payload.type === CanvasSyncType.PRESENCE) {
-        const update = YAwareness.encodeAwarenessUpdate(awareness, [doc.clientID]);
-
-        await syncCanvas(
-          {
-            clientId,
-            canvasId,
-            type: CanvasSyncType.AWARENESS,
-            data: update.toBase64(),
-          },
-          { transport: 'ws' },
-        );
-      }
-    });
-
     const persistence = new IndexeddbPersistence(`typie:canvas:${canvasId}`, doc);
-    persistence.on('synced', () => forceSync());
 
     if (entity.node.__typename === 'Canvas') {
       Y.applyUpdateV2(doc, Uint8Array.fromBase64(entity.node.update), 'remote');
     }
 
-    awareness.setLocalStateField('user', {
-      name: $query.me.name,
-      color: random({ luminosity: 'bright', seed: stringHash($query.me.id) }).toHexString(),
-    });
-
-    const forceSyncInterval = setInterval(() => forceSync(), 10_000);
-    const heartbeatInterval = setInterval(() => {
-      if (dayjs().diff(lastHeartbeatAt, 'seconds') > DISCONNECT_THRESHOLD) {
-        connectionStatus = 'disconnected';
-      }
-    }, 1000);
+    const fullSyncInterval = setInterval(() => fullSync(), 60_000);
 
     if (canvas) {
       const { x, y, width, height } = canvas.scene.getLayer().getClientRect();
@@ -317,26 +153,12 @@
       canvas.scaleTo(Math.min(stageWidth / (width + 100), stageHeight / (height + 100), 1));
     }
 
+    fullSync();
+
     return () => {
-      clearInterval(forceSyncInterval);
-      clearInterval(heartbeatInterval);
-
-      if (syncUpdateTimeout) {
-        clearTimeout(syncUpdateTimeout);
-      }
-
-      if (syncAwarenessTimeout) {
-        clearTimeout(syncAwarenessTimeout);
-      }
-
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-
-      YAwareness.removeAwarenessStates(awareness, [doc.clientID], 'local');
-      unsubscribe();
+      clearInterval(fullSyncInterval);
 
       persistence.destroy();
-      awareness.destroy();
       doc.destroy();
     };
   });
@@ -381,7 +203,7 @@
 {/if}
 
 <div class={css({ position: 'relative', flex: '1', overflowX: 'auto' })}>
-  <CanvasEditor style={css.raw({ size: 'full' })} {awareness} {doc} bind:canvas />
+  <CanvasEditor style={css.raw({ size: 'full' })} {doc} bind:canvas />
 
   <div
     class={center({
@@ -401,27 +223,6 @@
     use:dragView={dragViewProps}
   >
     <Icon style={css.raw({ color: 'text.faint' })} icon={LineSquiggleIcon} size={16} />
-
-    <div class={css({ width: '1px', height: '16px', backgroundColor: 'border.default' })}></div>
-
-    <div
-      style:background-color={match(connectionStatus)
-        .with('connecting', () => '#eab308')
-        .with('connected', () => '#22c55e')
-        .with('disconnected', () => '#ef4444')
-        .exhaustive()}
-      class={css({ size: '8px', borderRadius: 'full' })}
-      use:tooltip={{
-        message: match(connectionStatus)
-          .with('connecting', () => '서버 연결 중...')
-          .with('connected', () => '실시간 저장 중')
-          .with('disconnected', () => '서버 연결 끊김')
-          .exhaustive(),
-        placement: 'left',
-        offset: 12,
-        delay: 0,
-      }}
-    ></div>
 
     {#if titleEditing}
       <input

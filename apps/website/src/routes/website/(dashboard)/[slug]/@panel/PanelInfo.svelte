@@ -88,26 +88,7 @@
   <div class={flex({ flexDirection: 'column', gap: '20px', paddingX: '20px', paddingY: '16px', overflowY: 'auto' })}>
     <div class={flex({ flexDirection: 'column', gap: '6px' })}>
       <div class={flex({ justifyContent: 'space-between', alignItems: 'center' })}>
-        <div class={css({ fontSize: '13px', fontWeight: 'semibold', color: 'text.subtle' })}>공유 및 게시</div>
-
-        {#if $user.id === $post.entity.user.id}
-          <button
-            class={css({
-              fontSize: '13px',
-              fontWeight: 'medium',
-              color: 'text.faint',
-              transition: 'common',
-              _hover: { color: 'text.subtle' },
-            })}
-            onclick={() => {
-              app.state.shareOpen = [$post.entity.id];
-              mixpanel.track('open_post_share_modal', { via: 'panel' });
-            }}
-            type="button"
-          >
-            설정
-          </button>
-        {/if}
+        <div class={css({ fontSize: '13px', fontWeight: 'semibold', color: 'text.subtle' })}>공개 상태</div>
       </div>
 
       <div class={flex({ alignItems: 'center', gap: '4px' })}>

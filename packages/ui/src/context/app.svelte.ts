@@ -52,7 +52,6 @@ type AppState = {
   trashOpen: boolean;
   commandPaletteOpen: boolean;
   notesOpen: boolean;
-  shareOpen: string[];
   statsOpen: boolean;
   upgradeOpen: boolean;
   findReplaceOpenByViewId: Record<string, boolean>;
@@ -92,7 +91,6 @@ export const setupAppContext = (userId: string) => {
     trashOpen: false,
     commandPaletteOpen: false,
     notesOpen: false,
-    shareOpen: [],
     statsOpen: false,
     upgradeOpen: false,
     findReplaceOpenByViewId: {},

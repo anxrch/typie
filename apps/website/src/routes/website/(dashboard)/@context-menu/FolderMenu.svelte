@@ -7,7 +7,6 @@
   import { comma } from '@typie/ui/utils';
   import mixpanel from 'mixpanel-browser';
   import { EntityType, EntityVisibility } from '@/enums';
-  import BlendIcon from '~icons/lucide/blend';
   import CheckIcon from '~icons/lucide/check';
   import ExternalLinkIcon from '~icons/lucide/external-link';
   import FileIcon from '~icons/lucide/file';
@@ -137,18 +136,6 @@
 <HorizontalDivider color="secondary" />
 
 <MenuItem external href={entity.url} icon={ExternalLinkIcon} type="link">사이트에서 열기</MenuItem>
-
-<HorizontalDivider color="secondary" />
-
-<MenuItem
-  icon={BlendIcon}
-  onclick={() => {
-    app.state.shareOpen = [entity.id];
-    mixpanel.track('open_folder_share_modal', { via });
-  }}
->
-  공유 및 게시
-</MenuItem>
 
 <HorizontalDivider color="secondary" />
 
