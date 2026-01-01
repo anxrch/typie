@@ -9,7 +9,6 @@
   import mixpanel from 'mixpanel-browser';
   import { EntityAvailability, EntityVisibility, ExportLayoutMode, PostLayoutMode } from '@/enums';
   import { TypieError } from '@/errors';
-  import BlendIcon from '~icons/lucide/blend';
   import Columns2Icon from '~icons/lucide/columns-2';
   import CopyIcon from '~icons/lucide/copy';
   import DownloadIcon from '~icons/lucide/download';
@@ -235,18 +234,6 @@
 <MenuItem external href={entity.url} icon={ExternalLinkIcon} type="link">사이트에서 열기</MenuItem>
 
 <HorizontalDivider color="secondary" />
-
-<MenuItem
-  icon={BlendIcon}
-  onclick={() => {
-    app.state.shareOpen = [entity.id];
-    if (via === 'editor') {
-      mixpanel.track('open_post_share_modal', { via: 'editor' });
-    }
-  }}
->
-  공유 및 게시
-</MenuItem>
 
 <MenuItem icon={CopyIcon} onclick={handleDuplicate}>복제</MenuItem>
 

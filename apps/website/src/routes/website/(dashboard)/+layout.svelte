@@ -19,7 +19,6 @@
   import { setupEditorRegistry } from './[slug]/@split-view/editor-registry.svelte';
   import Notes from './@notes/Notes.svelte';
   import PreferenceModal from './@preference/PreferenceModal.svelte';
-  import ShareModal from './@share/ShareModal.svelte';
   import StatsModal from './@stats/StatsModal.svelte';
   import TrashModal from './@trash/TrashModal.svelte';
   import CanvasDeprecationModal from './CanvasDeprecationModal.svelte';
@@ -334,7 +333,6 @@
 <CommandPalette $user={$query.me} />
 <Notes {$query} />
 <PreferenceModal $user={$query.me} />
-<ShareModal />
 <StatsModal />
 <TrashModal $site={$query.me.sites[0]} />
 <Shortcuts {$query} />

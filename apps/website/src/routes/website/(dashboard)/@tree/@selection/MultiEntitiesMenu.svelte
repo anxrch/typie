@@ -6,7 +6,6 @@
   import { Dialog, Toast } from '@typie/ui/notification';
   import mixpanel from 'mixpanel-browser';
   import { onMount } from 'svelte';
-  import BlendIcon from '~icons/lucide/blend';
   import FileIcon from '~icons/lucide/file';
   import FolderIcon from '~icons/lucide/folder';
   import InfoIcon from '~icons/lucide/info';
@@ -87,30 +86,6 @@
 </div>
 
 <HorizontalDivider color="secondary" />
-
-{#if folderIds.length > 0}
-  <MenuItem
-    icon={BlendIcon}
-    onclick={() => {
-      app.state.shareOpen = folderIds;
-      mixpanel.track('open_folder_share_modal', { via: 'multi_entities_menu', count: folderIds.length });
-    }}
-  >
-    폴더 {folderIds.length}개 공유 및 게시
-  </MenuItem>
-{/if}
-
-{#if postIds.length > 0}
-  <MenuItem
-    icon={BlendIcon}
-    onclick={() => {
-      app.state.shareOpen = postIds;
-      mixpanel.track('open_post_share_modal', { via: 'multi_entities_menu', count: postIds.length });
-    }}
-  >
-    포스트 {postIds.length}개 공유 및 게시
-  </MenuItem>
-{/if}
 
 <MenuItem
   icon={TrashIcon}

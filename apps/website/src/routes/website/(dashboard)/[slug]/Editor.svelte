@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { random } from '@ctrl/tinycolor';
-  import stringHash from '@sindresorhus/string-hash';
   import { isiOS, isMacOS } from '@tiptap/core';
   import { Selection, Transaction } from '@tiptap/pm/state';
   import { css, cx } from '@typie/styled-system/css';
@@ -20,7 +18,6 @@
   import { match } from 'ts-pattern';
   import { IndexeddbPersistence } from 'y-indexeddb';
   import { defaultDeleteFilter, defaultProtectedNodes, ySyncPluginKey } from 'y-prosemirror';
-  import * as YAwareness from 'y-protocols/awareness';
   import * as Y from 'yjs';
   import { PostLayoutMode, PostSyncType } from '@/enums';
   import ChevronRightIcon from '~icons/lucide/chevron-right';
@@ -52,8 +49,6 @@
   import type { Editor } from '@tiptap/core';
   import type { PageLayout, Ref } from '@typie/ui/utils';
   import type { Editor_query } from '$graphql';
-
-  const DISCONNECT_THRESHOLD = 3;
 
   type Props = {
     $query: Editor_query;
@@ -173,16 +168,6 @@
     }
   `);
 
-  const postSyncStream = graphql(`
-    subscription Editor_PostSyncStream_Subscription($clientId: String!, $postId: ID!) {
-      postSyncStream(clientId: $clientId, postId: $postId) {
-        postId
-        type
-        data
-      }
-    }
-  `);
-
   const editorContext = setupEditorContext();
 
   const app = getAppContext();
@@ -226,9 +211,6 @@
   let editor = $state<Ref<Editor>>();
   let viewEditor = $state<Ref<Editor>>();
 
-  let connectionStatus = $state<'connecting' | 'connected' | 'disconnected'>('connecting');
-  let lastHeartbeatAt = $state(dayjs());
-
   let mounted = $state(false);
 
   let showAnchorOutline = $state(false);
@@ -242,7 +224,6 @@
   const doc = new Y.Doc();
   let viewDoc = $state<Y.Doc>();
 
-  const awareness = new YAwareness.Awareness(doc);
   const undoManager = new Y.UndoManager([doc.getMap('attrs'), doc.getXmlFragment('body')], {
     trackedOrigins: new Set([ySyncPluginKey, 'local']),
     captureTransaction: (tr) => tr.meta.get('addToHistory') !== false,
@@ -303,30 +284,6 @@
       ...selectionsStore.current,
       [postId]: { ...selection.toJSON(), timestamp: dayjs().valueOf() },
     };
-  };
-
-  let syncUpdateTimeout: NodeJS.Timeout | null = null;
-  let pendingUpdate: Uint8Array | null = null;
-  let lastSyncTime = Date.now();
-
-  let syncAwarenessTimeout: NodeJS.Timeout | null = null;
-  let pendingAwarenessStates: { added: number[]; updated: number[]; removed: number[] } | null = null;
-  let lastAwarenessSyncTime = Date.now();
-
-  const forceSync = async () => {
-    if (!postId) return;
-
-    const vector = Y.encodeStateVector(doc);
-
-    await syncPost(
-      {
-        clientId,
-        postId,
-        type: PostSyncType.VECTOR,
-        data: vector.toBase64(),
-      },
-      { transport: 'ws' },
-    );
   };
 
   const fullSync = async () => {
@@ -416,187 +373,6 @@
     return untrack(() => {
       const currentPostId = postId;
 
-      const handleOnline = () => {
-        const isFresh = dayjs().diff(lastHeartbeatAt, 'seconds') <= DISCONNECT_THRESHOLD;
-        if (isFresh) {
-          connectionStatus = 'connected';
-        } else {
-          connectionStatus = 'connecting';
-        }
-      };
-
-      const handleOffline = () => {
-        connectionStatus = 'disconnected';
-      };
-
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-
-      if (!navigator.onLine) {
-        connectionStatus = 'disconnected';
-      }
-
-      doc.on('updateV2', async (update, origin) => {
-        if (browser && origin !== 'remote' && postId === currentPostId) {
-          if (pendingUpdate) {
-            pendingUpdate = Y.mergeUpdatesV2([pendingUpdate, update]);
-          } else {
-            pendingUpdate = update;
-          }
-
-          if (syncUpdateTimeout) {
-            clearTimeout(syncUpdateTimeout);
-          }
-
-          const timeSinceLastSync = Date.now() - lastSyncTime;
-          const shouldForceSync = timeSinceLastSync >= 100;
-
-          if (shouldForceSync && pendingUpdate) {
-            if (postId === currentPostId) {
-              await syncPost(
-                {
-                  clientId,
-                  postId,
-                  type: PostSyncType.UPDATE,
-                  data: pendingUpdate.toBase64(),
-                },
-                { transport: 'ws' },
-              );
-
-              pendingUpdate = null;
-              lastSyncTime = Date.now();
-            }
-          } else {
-            const remainingTime = Math.max(0, 100 - timeSinceLastSync);
-
-            syncUpdateTimeout = setTimeout(async () => {
-              if (pendingUpdate && postId === currentPostId) {
-                await syncPost(
-                  {
-                    clientId,
-                    postId,
-                    type: PostSyncType.UPDATE,
-                    data: pendingUpdate.toBase64(),
-                  },
-                  { transport: 'ws' },
-                );
-
-                pendingUpdate = null;
-                lastSyncTime = Date.now();
-              }
-            }, remainingTime);
-          }
-        }
-      });
-
-      awareness.on('update', async (states: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
-        if (browser && origin !== 'remote' && postId === currentPostId) {
-          if (pendingAwarenessStates) {
-            pendingAwarenessStates = {
-              added: [...new Set([...pendingAwarenessStates.added, ...states.added])],
-              updated: [...new Set([...pendingAwarenessStates.updated, ...states.updated])],
-              removed: [...new Set([...pendingAwarenessStates.removed, ...states.removed])],
-            };
-          } else {
-            pendingAwarenessStates = states;
-          }
-
-          if (syncAwarenessTimeout) {
-            clearTimeout(syncAwarenessTimeout);
-          }
-
-          const timeSinceLastSync = Date.now() - lastAwarenessSyncTime;
-          const shouldForceSync = timeSinceLastSync >= 100;
-
-          if (shouldForceSync && pendingAwarenessStates) {
-            if (postId === currentPostId) {
-              const update = YAwareness.encodeAwarenessUpdate(awareness, [
-                ...pendingAwarenessStates.added,
-                ...pendingAwarenessStates.updated,
-                ...pendingAwarenessStates.removed,
-              ]);
-
-              await syncPost(
-                {
-                  clientId,
-                  postId,
-                  type: PostSyncType.AWARENESS,
-                  data: update.toBase64(),
-                },
-                { transport: 'ws' },
-              );
-
-              pendingAwarenessStates = null;
-              lastAwarenessSyncTime = Date.now();
-            }
-          } else {
-            const remainingTime = Math.max(0, 100 - timeSinceLastSync);
-
-            syncAwarenessTimeout = setTimeout(async () => {
-              if (pendingAwarenessStates && postId === currentPostId) {
-                const update = YAwareness.encodeAwarenessUpdate(awareness, [
-                  ...pendingAwarenessStates.added,
-                  ...pendingAwarenessStates.updated,
-                  ...pendingAwarenessStates.removed,
-                ]);
-
-                await syncPost(
-                  {
-                    clientId,
-                    postId,
-                    type: PostSyncType.AWARENESS,
-                    data: update.toBase64(),
-                  },
-                  { transport: 'ws' },
-                );
-
-                pendingAwarenessStates = null;
-                lastAwarenessSyncTime = Date.now();
-              }
-            }, remainingTime);
-          }
-        }
-      });
-
-      const unsubscribe = postSyncStream.subscribe({ clientId, postId: currentPostId }, async (payload) => {
-        if (postId !== currentPostId) {
-          return;
-        }
-
-        if (payload.type === PostSyncType.HEARTBEAT) {
-          lastHeartbeatAt = dayjs(payload.data);
-          connectionStatus = 'connected';
-        } else if (payload.type === PostSyncType.UPDATE) {
-          Y.applyUpdateV2(doc, Uint8Array.fromBase64(payload.data), 'remote');
-        } else if (payload.type === PostSyncType.VECTOR) {
-          const update = Y.encodeStateAsUpdateV2(doc, Uint8Array.fromBase64(payload.data));
-
-          await syncPost(
-            {
-              clientId,
-              postId: currentPostId,
-              type: PostSyncType.UPDATE,
-              data: update.toBase64(),
-            },
-            { transport: 'ws' },
-          );
-        } else if (payload.type === PostSyncType.AWARENESS) {
-          YAwareness.applyAwarenessUpdate(awareness, Uint8Array.fromBase64(payload.data), 'remote');
-        } else if (payload.type === PostSyncType.PRESENCE) {
-          const update = YAwareness.encodeAwarenessUpdate(awareness, [doc.clientID]);
-
-          await syncPost(
-            {
-              clientId,
-              postId: currentPostId,
-              type: PostSyncType.AWARENESS,
-              data: update.toBase64(),
-            },
-            { transport: 'ws' },
-          );
-        }
-      });
-
       const persistence = new IndexeddbPersistence(`typie:editor:${currentPostId}`, doc);
 
       if (entity.node.__typename === 'Post') {
@@ -606,11 +382,6 @@
           layoutMode.current = PostLayoutMode.SCROLL;
         }
       }
-
-      awareness.setLocalStateField('user', {
-        name: $query.me.name,
-        color: random({ luminosity: 'bright', seed: stringHash($query.me.id) }).toHexString(),
-      });
 
       editor?.current.once('create', ({ editor }) => {
         const isDocumentEmpty = editor.state.doc.child(0).childCount === 1 && editor.state.doc.child(0).child(0).childCount === 0;
@@ -656,12 +427,6 @@
       });
 
       const fullSyncInterval = setInterval(() => fullSync(), 60_000);
-      const forceSyncInterval = setInterval(() => forceSync(), 10_000);
-      const heartbeatInterval = setInterval(() => {
-        if (dayjs().diff(lastHeartbeatAt, 'seconds') > DISCONNECT_THRESHOLD) {
-          connectionStatus = 'disconnected';
-        }
-      }, 1000);
 
       const off = on(globalThis.window, 'keydown', async (e) => {
         if (!focused) return;
@@ -670,8 +435,8 @@
           e.preventDefault();
           e.stopPropagation();
 
-          forceSync();
-          Tip.show('editor.shortcut.save', '따로 저장 키를 누르지 않아도 모든 변경 사항은 실시간으로 저장돼요.');
+          fullSync();
+          Tip.show('editor.shortcut.save', '따로 저장 키를 누르지 않아도 모든 변경 사항은 주기적으로 저장돼요.');
         }
       });
 
@@ -713,16 +478,6 @@
         off();
 
         clearInterval(fullSyncInterval);
-        clearInterval(forceSyncInterval);
-        clearInterval(heartbeatInterval);
-
-        if (syncUpdateTimeout) {
-          clearTimeout(syncUpdateTimeout);
-        }
-
-        if (syncAwarenessTimeout) {
-          clearTimeout(syncAwarenessTimeout);
-        }
 
         if (anchorTriggerTimeout) {
           clearTimeout(anchorTriggerTimeout);
@@ -734,17 +489,10 @@
           anchorHideTimeout = null;
         }
 
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-
-        YAwareness.removeAwarenessStates(awareness, [doc.clientID], 'local');
-        unsubscribe();
-
         editor?.current.off('selectionUpdate', persistSelection);
         editor?.current.off('transaction', applyInitialMarks);
 
         persistence.destroy();
-        awareness.destroy();
         doc.destroy();
       };
     });
@@ -863,27 +611,6 @@
               <span>업그레이드</span>
             </button>
           {/if}
-
-          <div class={center({ size: '24px' })}>
-            <div
-              style:background-color={match(connectionStatus)
-                .with('connecting', () => '#eab308')
-                .with('connected', () => '#22c55e')
-                .with('disconnected', () => '#ef4444')
-                .exhaustive()}
-              class={css({ size: '8px', borderRadius: 'full' })}
-              use:tooltip={{
-                message: match(connectionStatus)
-                  .with('connecting', () => '서버 연결 중...')
-                  .with('connected', () => '실시간 저장 중')
-                  .with('disconnected', () => '서버 연결 끊김')
-                  .exhaustive(),
-                placement: 'left',
-                offset: 12,
-                delay: 0,
-              }}
-            ></div>
-          </div>
 
           {#if $query.me.id === entity.user.id}
             <Menu>
@@ -1201,7 +928,6 @@
                           style={css.raw({
                             size: 'full',
                           })}
-                          awareness={viewDoc ? undefined : awareness}
                           {doc}
                           editable={!viewDoc}
                           oncreate={() => {
