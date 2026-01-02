@@ -21,8 +21,6 @@ enum SecondaryToolbarMode {
 
 enum BottomToolbarMode { hidden, insert, horizontalRule, blockquote }
 
-enum ConnectionStatus { connecting, connected, disconnected }
-
 class EditorStateScope extends InheritedWidget {
   const EditorStateScope({
     required super.child,
@@ -38,7 +36,6 @@ class EditorStateScope extends InheritedWidget {
     required this.bottomToolbarMode,
     required this.secondaryToolbarMode,
     required this.focusedElement,
-    required this.connectionStatus,
     required this.isBottomSheetOpen,
     required this.scrollTop,
     super.key,
@@ -56,7 +53,6 @@ class EditorStateScope extends InheritedWidget {
   final ValueNotifier<BottomToolbarMode> bottomToolbarMode;
   final ValueNotifier<SecondaryToolbarMode> secondaryToolbarMode;
   final ValueNotifier<String?> focusedElement;
-  final ValueNotifier<ConnectionStatus> connectionStatus;
   final ValueNotifier<bool> isBottomSheetOpen;
   final ValueNotifier<double> scrollTop;
 

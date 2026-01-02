@@ -33,24 +33,11 @@ class EditorScreen extends HookWidget {
     final bottomToolbarMode = useValueNotifier<BottomToolbarMode>(BottomToolbarMode.hidden);
     final secondaryToolbarMode = useValueNotifier<SecondaryToolbarMode>(SecondaryToolbarMode.hidden);
     final focusedElement = useValueNotifier<String?>(null);
-    final connectionStatus = useValueNotifier<ConnectionStatus>(ConnectionStatus.connecting);
     final isBottomSheetOpen = useValueNotifier<bool>(false);
     final scrollTop = useValueNotifier<double>(0);
 
     final pageController = usePageController();
     final drag = useRef<Drag?>(null);
-
-    useEffect(() {
-      final listener = AppLifecycleListener(
-        onStateChange: (state) {
-          if (state == AppLifecycleState.resumed) {
-            connectionStatus.value = ConnectionStatus.connecting;
-            unawaited(webViewController.value?.emitEvent('appResumed', <String, dynamic>{}));
-          }
-        },
-      );
-      return listener.dispose;
-    }, [webViewController, connectionStatus]);
 
     return EditorStateScope(
       data: data,
@@ -65,7 +52,6 @@ class EditorScreen extends HookWidget {
       bottomToolbarMode: bottomToolbarMode,
       secondaryToolbarMode: secondaryToolbarMode,
       focusedElement: focusedElement,
-      connectionStatus: connectionStatus,
       isBottomSheetOpen: isBottomSheetOpen,
       scrollTop: scrollTop,
       child: Material(

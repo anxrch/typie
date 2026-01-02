@@ -24,7 +24,6 @@ import 'package:typie/hooks/route_resumed.dart';
 import 'package:typie/hooks/service.dart';
 import 'package:typie/icons/lucide_light.dart';
 import 'package:typie/icons/typie.dart';
-import 'package:typie/modals/share.dart';
 import 'package:typie/routers/app.gr.dart';
 import 'package:typie/screens/entity/__generated__/create_folder_mutation.req.gql.dart';
 import 'package:typie/screens/entity/__generated__/create_post_mutation.req.gql.dart';
@@ -249,20 +248,6 @@ class _EntityList extends HookWidget {
 
                                 final url = Uri.parse(entity!.url);
                                 await launchUrl(url, mode: LaunchMode.externalApplication);
-                              },
-                            ),
-                            BottomMenuItem(
-                              icon: LucideLightIcons.blend,
-                              label: '공유하기',
-                              onTap: () async {
-                                unawaited(
-                                  mixpanel.track('open_folder_share_modal', properties: {'via': 'entity_menu'}),
-                                );
-
-                                await context.showBottomSheet(
-                                  intercept: true,
-                                  child: ShareBottomSheet(entityIds: [entity!.id]),
-                                );
                               },
                             ),
                             const BottomMenuSeparator(),
@@ -497,23 +482,6 @@ class _EntityList extends HookWidget {
                                       await launchUrl(url, mode: LaunchMode.externalApplication);
                                     },
                                   ),
-                                  BottomMenuItem(
-                                    icon: LucideLightIcons.blend,
-                                    label: '공유하기',
-                                    onTap: () async {
-                                      unawaited(
-                                        mixpanel.track(
-                                          'open_folder_share_modal',
-                                          properties: {'via': 'entity_folder_menu'},
-                                        ),
-                                      );
-
-                                      await context.showBottomSheet(
-                                        intercept: true,
-                                        child: ShareBottomSheet(entityIds: [entities[index].id]),
-                                      );
-                                    },
-                                  ),
                                   const BottomMenuSeparator(),
                                   BottomMenuItem(
                                     icon: LucideLightIcons.square_pen,
@@ -638,23 +606,6 @@ class _EntityList extends HookWidget {
 
                                       final url = Uri.parse(entities[index].url);
                                       await launchUrl(url, mode: LaunchMode.externalApplication);
-                                    },
-                                  ),
-                                  BottomMenuItem(
-                                    icon: LucideLightIcons.blend,
-                                    label: '공유하기',
-                                    onTap: () async {
-                                      unawaited(
-                                        mixpanel.track(
-                                          'open_post_share_modal',
-                                          properties: {'via': 'entity_post_menu'},
-                                        ),
-                                      );
-
-                                      await context.showBottomSheet(
-                                        intercept: true,
-                                        child: ShareBottomSheet(entityIds: [entities[index].id]),
-                                      );
                                     },
                                   ),
                                   BottomMenuItem(

@@ -20,7 +20,6 @@ import 'package:typie/hooks/async_effect.dart';
 import 'package:typie/hooks/service.dart';
 import 'package:typie/icons/lucide_lab.dart';
 import 'package:typie/icons/lucide_light.dart';
-import 'package:typie/modals/share.dart';
 import 'package:typie/routers/app.gr.dart';
 import 'package:typie/screens/editor/__generated__/delete_post_mutation.req.gql.dart';
 import 'package:typie/screens/editor/__generated__/duplicate_post_mutation.req.gql.dart';
@@ -70,7 +69,6 @@ class Editor extends HookWidget {
     final scope = EditorStateScope.of(context);
     final webViewController = useValueListenable(scope.webViewController);
     final mode = useValueListenable(scope.mode);
-    final connectionStatus = useValueListenable(scope.connectionStatus);
 
     useEffect(() {
       final subscription = keyboard.onHeightChange.listen((height) {
@@ -111,14 +109,6 @@ class Editor extends HookWidget {
 
       final subscription = webViewController.onEvent.listen((event) async {
         switch (event.name) {
-          case 'connectionStatus':
-            final status = event.data as String;
-            scope.connectionStatus.value = switch (status) {
-              'connecting' => ConnectionStatus.connecting,
-              'connected' => ConnectionStatus.connected,
-              'disconnected' => ConnectionStatus.disconnected,
-              _ => ConnectionStatus.connecting,
-            };
           case 'webviewReady':
             await webViewController.requestFocus();
             await webViewController.emitEvent('appReady', {
@@ -235,9 +225,6 @@ class Editor extends HookWidget {
           heading: Heading(
             titleIcon: LucideLabIcons.text_square,
             title: data.post.title,
-            banner: connectionStatus == ConnectionStatus.disconnected
-                ? HeadingBanner(text: '연결이 끊어졌습니다', backgroundColor: context.colors.accentDanger)
-                : null,
             actions: [
               HeadingAction(
                 icon: LucideLightIcons.ellipsis,
@@ -363,34 +350,6 @@ class Editor extends HookWidget {
 
                               final url = Uri.parse(data.post.entity.url);
                               await launchUrl(url, mode: LaunchMode.externalApplication);
-                            },
-                          ),
-                          BottomMenuItem(
-                            icon: LucideLightIcons.blend,
-                            label: '공유하기',
-                            trailing: data.post.entity.visibility == GEntityVisibility.UNLISTED
-                                ? Container(
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: context.colors.borderStrong),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    padding: const Pad(horizontal: 8, vertical: 4),
-                                    child: Text(
-                                      '링크 공개 중',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: context.colors.textDefault,
-                                      ),
-                                    ),
-                                  )
-                                : null,
-                            onTap: () async {
-                              unawaited(mixpanel.track('open_post_share_modal', properties: {'via': 'editor'}));
-                              await context.showBottomSheet(
-                                intercept: true,
-                                child: ShareBottomSheet(entityIds: [data.post.entity.id]),
-                              );
                             },
                           ),
                           BottomMenuItem(
