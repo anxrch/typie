@@ -1,11 +1,8 @@
 import { Node } from '@tiptap/pm/model';
 import dayjs from 'dayjs';
 import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, sum } from 'drizzle-orm';
-import { filter, pipe, Repeater } from 'graphql-yoga';
 import { nanoid } from 'nanoid';
 import { match } from 'ts-pattern';
-import * as Y from 'yjs';
-import { redis } from '@/cache';
 import {
   db,
   Entities,
@@ -43,10 +40,8 @@ import { env } from '@/env';
 import { NotFoundError, TypieError } from '@/errors';
 import * as slack from '@/external/slack';
 import * as spellcheck from '@/external/spellcheck';
-import { enqueueJob } from '@/mq';
 import { schema, textSerializers } from '@/pm';
-import { pubsub } from '@/pubsub';
-import { generateFractionalOrder, generatePermalink, generateSlug, getKoreanAge, makeText, makeYDoc } from '@/utils';
+import { generateFractionalOrder, generatePermalink, generateSlug, getKoreanAge, makeText } from '@/utils';
 import { compressZstd, decompressZstd } from '@/utils/compression';
 import { assertSitePermission } from '@/utils/permission';
 import { assertPlanRule } from '@/utils/plan';
@@ -324,16 +319,6 @@ PostView.implement({
           }
         }
 
-        if (self.password !== null) {
-          const passwordUnlock = await redis.get(`postview:unlock:${self.id}:${ctx.deviceId}`);
-
-          if (passwordUnlock !== 'true') {
-            return {
-              __typename: 'PostViewBodyUnavailable',
-              reason: PostViewBodyUnavailableReason.REQUIRE_PASSWORD,
-            };
-          }
-        }
 
         const loader = ctx.loader({
           name: 'PostView.body',
@@ -475,10 +460,9 @@ builder.mutationFields((t) => ({
       const body = node.toJSON();
       const text = makeText(body);
 
-      const initialMarks = [schema.marks.text_style.create({ fontFamily, fontSize, fontWeight }).toJSON()];
-
-      const doc = makeYDoc({ title, subtitle, body, maxWidth, layoutMode, pageLayout, initialMarks });
-      const snapshot = Y.snapshot(doc);
+      const storedMarks = [schema.marks.text_style.create({ fontFamily, fontSize, fontWeight }).toJSON()];
+      const update = new Uint8Array();
+      const vector = new Uint8Array();
 
       let depth = 0;
       if (input.parentEntityId) {
@@ -542,14 +526,14 @@ builder.mutationFields((t) => ({
           postId: post.id,
           body,
           text,
-          update: Y.encodeStateAsUpdateV2(doc),
-          vector: Y.encodeStateVector(doc),
+          storedMarks,
+          update,
+          vector,
           layoutMode,
           pageLayout,
         });
 
-        const snapshotData = Y.encodeSnapshotV2(snapshot);
-        const compressedSnapshot = await compressZstd(snapshotData);
+        const compressedSnapshot = await compressZstd(new Uint8Array());
 
         const postSnapshot = await tx
           .insert(PostSnapshots)
@@ -567,11 +551,6 @@ builder.mutationFields((t) => ({
 
         return post;
       });
-
-      pubsub.publish('site:update', input.siteId, { scope: 'site' });
-      pubsub.publish('site:usage:update', input.siteId, null);
-
-      await enqueueJob('post:index', post.id);
 
       return post;
     },
@@ -671,19 +650,8 @@ builder.mutationFields((t) => ({
       }
 
       const title = `(사본) ${post.title ?? '(제목 없음)'}`;
-
-      const doc = makeYDoc({
-        title,
-        subtitle: post.subtitle,
-        body: post.content.body,
-        maxWidth: post.maxWidth,
-        storedMarks: post.content.storedMarks,
-        layoutMode: post.content.layoutMode,
-        pageLayout: post.content.pageLayout,
-        anchors: Object.fromEntries(anchors.map((anchor) => [anchor.nodeId, anchor.name])),
-      });
-
-      const snapshot = Y.snapshot(doc);
+      const update = new Uint8Array();
+      const vector = new Uint8Array();
 
       const newPost = await db.transaction(async (tx) => {
         const newEntity = await tx
@@ -720,8 +688,9 @@ builder.mutationFields((t) => ({
           postId: newPost.id,
           body: post.content.body,
           text: post.content.text,
-          update: Y.encodeStateAsUpdateV2(doc),
-          vector: Y.encodeStateVector(doc),
+          storedMarks: post.content.storedMarks,
+          update,
+          vector,
           characterCount: post.content.characterCount,
           blobSize: post.content.blobSize,
           layoutMode: post.content.layoutMode,
@@ -732,8 +701,7 @@ builder.mutationFields((t) => ({
           await tx.insert(PostAnchors).values(anchors.map((anchor) => ({ postId: newPost.id, nodeId: anchor.nodeId, name: anchor.name })));
         }
 
-        const snapshotData = Y.encodeSnapshotV2(snapshot);
-        const compressedSnapshot = await compressZstd(snapshotData);
+        const compressedSnapshot = await compressZstd(new Uint8Array());
 
         const postSnapshot = await tx
           .insert(PostSnapshots)
@@ -774,11 +742,6 @@ builder.mutationFields((t) => ({
         return newPost;
       });
 
-      pubsub.publish('site:update', entity.siteId, { scope: 'site' });
-      pubsub.publish('site:usage:update', entity.siteId, null);
-
-      await enqueueJob('post:index', newPost.id);
-
       return newPost;
     },
   }),
@@ -814,11 +777,6 @@ builder.mutationFields((t) => ({
           .where(and(eq(Notes.entityId, entity.id), eq(Notes.state, NoteState.ACTIVE)));
       });
 
-      pubsub.publish('site:update', entity.siteId, { scope: 'site' });
-      pubsub.publish('site:update', entity.siteId, { scope: 'entity', entityId: entity.id });
-      pubsub.publish('site:usage:update', entity.siteId, null);
-
-      await enqueueJob('post:index', input.postId);
 
       return input.postId;
     },
@@ -952,11 +910,6 @@ builder.mutationFields((t) => ({
         return posts.map((post) => post.id);
       });
 
-      pubsub.publish('site:update', siteId, { scope: 'site' });
-      for (const post of posts) {
-        pubsub.publish('site:update', siteId, { scope: 'entity', entityId: post.entityId });
-      }
-
       return updatedPostIds;
     },
   }),
@@ -990,14 +943,12 @@ builder.mutationFields((t) => ({
       postId: t.input.id({ validate: validateDbId(TableCode.POSTS) }),
       password: t.input.string(),
     },
-    resolve: async (_, { input }, ctx) => {
+    resolve: async (_, { input }) => {
       const post = await db.select({ password: Posts.password }).from(Posts).where(eq(Posts.id, input.postId)).then(firstOrThrow);
 
       if (post.password !== input.password) {
         throw new TypieError({ code: 'invalid_password' });
       }
-
-      await redis.setex(`postview:unlock:${input.postId}:${ctx.deviceId}`, 60 * 60 * 24, 'true');
 
       return input.postId;
     },
@@ -1061,50 +1012,6 @@ builder.mutationFields((t) => ({
         await assertSitePermission({
           userId: ctx.session.userId,
           siteId: post.siteId,
-        });
-      }
-
-      if (input.type === PostSyncType.UPDATE) {
-        pubsub.publish('post:sync', input.postId, {
-          target: `!${input.clientId}`,
-          type: PostSyncType.UPDATE,
-          data: input.data,
-        });
-
-        await redis.lpush(
-          `post:sync:updates:${input.postId}`,
-          JSON.stringify({
-            userId: ctx.session.userId,
-            data: input.data,
-          }),
-        );
-
-        await enqueueJob('post:sync:collect', input.postId);
-      } else if (input.type === PostSyncType.VECTOR) {
-        const contents = await db
-          .select({ update: PostContents.update, vector: PostContents.vector })
-          .from(PostContents)
-          .where(eq(PostContents.postId, input.postId))
-          .then(firstOrThrow);
-
-        const update = Y.diffUpdateV2(contents.update, Uint8Array.fromBase64(input.data));
-
-        pubsub.publish('post:sync', input.postId, {
-          target: input.clientId,
-          type: PostSyncType.UPDATE,
-          data: update.toBase64(),
-        });
-
-        pubsub.publish('post:sync', input.postId, {
-          target: input.clientId,
-          type: PostSyncType.VECTOR,
-          data: contents.vector.toBase64(),
-        });
-      } else if (input.type === PostSyncType.AWARENESS) {
-        pubsub.publish('post:sync', input.postId, {
-          target: `!${input.clientId}`,
-          type: PostSyncType.AWARENESS,
-          data: input.data,
         });
       }
 
@@ -1240,83 +1147,3 @@ builder.mutationFields((t) => ({
   }),
 }));
 
-/**
- * * Subscriptions
- */
-
-builder.subscriptionFields((t) => ({
-  postSyncStream: t.withAuth({ session: true }).field({
-    type: t.builder.simpleObject('PostSyncStreamPayload', {
-      fields: (t) => ({
-        postId: t.id(),
-        type: t.field({ type: PostSyncType }),
-        data: t.string(),
-      }),
-    }),
-    args: {
-      clientId: t.arg.string(),
-      postId: t.arg.id({ validate: validateDbId(TableCode.POSTS) }),
-    },
-    subscribe: async (_, args, ctx) => {
-      const post = await db
-        .select({ siteId: Entities.siteId, availability: Entities.availability })
-        .from(Posts)
-        .innerJoin(Entities, eq(Posts.entityId, Entities.id))
-        .where(eq(Posts.id, args.postId))
-        .then(firstOrThrow);
-
-      if (post.availability === EntityAvailability.PRIVATE) {
-        await assertSitePermission({
-          userId: ctx.session.userId,
-          siteId: post.siteId,
-        });
-      }
-
-      pubsub.publish('post:sync', args.postId, {
-        target: `!${args.clientId}`,
-        type: PostSyncType.PRESENCE,
-        data: '',
-      });
-
-      const repeater = Repeater.merge([
-        pubsub.subscribe('post:sync', args.postId),
-        new Repeater<{ target: string; type: PostSyncType; data: string }>(async (push, stop) => {
-          const heartbeat = () => {
-            push({
-              target: args.clientId,
-              type: PostSyncType.HEARTBEAT,
-              data: dayjs().toISOString(),
-            });
-          };
-
-          heartbeat();
-          const interval = setInterval(heartbeat, 1000);
-
-          await stop;
-
-          clearInterval(interval);
-        }),
-      ]);
-
-      return pipe(
-        repeater,
-        filter(({ target }) => {
-          if (target === '*') {
-            return true;
-          } else if (target.startsWith('!')) {
-            return target.slice(1) !== args.clientId;
-          } else {
-            return target === args.clientId;
-          }
-        }),
-      );
-    },
-    resolve: async (payload, args) => {
-      return {
-        postId: args.postId,
-        type: payload.type,
-        data: payload.data,
-      };
-    },
-  }),
-}));
