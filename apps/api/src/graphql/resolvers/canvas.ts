@@ -1,8 +1,5 @@
 import dayjs from 'dayjs';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { filter, pipe, Repeater } from 'graphql-yoga';
-import * as Y from 'yjs';
-import { redis } from '@/cache';
 import {
   CanvasContents,
   Canvases,
@@ -15,10 +12,8 @@ import {
   TableCode,
   validateDbId,
 } from '@/db';
-import { CanvasSyncType, EntityAvailability, EntityState, NoteState } from '@/enums';
+import { EntityAvailability, EntityState, NoteState } from '@/enums';
 import { NotFoundError } from '@/errors';
-import { enqueueJob } from '@/mq';
-import { pubsub } from '@/pubsub';
 import { assertSitePermission } from '@/utils/permission';
 import { builder } from '../builder';
 import { Canvas, CanvasSnapshot, CanvasView, Entity, EntityView, ICanvas, isTypeOf } from '../objects';
@@ -168,165 +163,7 @@ builder.mutationFields((t) => ({
           .where(and(eq(Notes.entityId, entity.id), eq(Notes.state, NoteState.ACTIVE)));
       });
 
-      pubsub.publish('site:update', entity.siteId, { scope: 'site' });
-      pubsub.publish('site:update', entity.siteId, { scope: 'entity', entityId: entity.id });
-      pubsub.publish('site:usage:update', entity.siteId, null);
-
-      await enqueueJob('canvas:index', input.canvasId);
-
       return input.canvasId;
-    },
-  }),
-
-  syncCanvas: t.withAuth({ session: true }).fieldWithInput({
-    type: 'Boolean',
-    input: {
-      clientId: t.input.string(),
-      canvasId: t.input.id({ validate: validateDbId(TableCode.CANVASES) }),
-      type: t.input.field({ type: CanvasSyncType }),
-      data: t.input.string(),
-    },
-    resolve: async (_, { input }, ctx) => {
-      const canvas = await db
-        .select({ siteId: Entities.siteId, availability: Entities.availability })
-        .from(Canvases)
-        .innerJoin(Entities, eq(Canvases.entityId, Entities.id))
-        .where(eq(Canvases.id, input.canvasId))
-        .then(firstOrThrow);
-
-      if (canvas.availability === EntityAvailability.PRIVATE) {
-        await assertSitePermission({
-          userId: ctx.session.userId,
-          siteId: canvas.siteId,
-        });
-      }
-
-      if (input.type === CanvasSyncType.UPDATE) {
-        pubsub.publish('canvas:sync', input.canvasId, {
-          target: `!${input.clientId}`,
-          type: CanvasSyncType.UPDATE,
-          data: input.data,
-        });
-
-        await redis.lpush(
-          `canvas:sync:updates:${input.canvasId}`,
-          JSON.stringify({
-            userId: ctx.session.userId,
-            data: input.data,
-          }),
-        );
-
-        await enqueueJob('canvas:sync:collect', input.canvasId);
-      } else if (input.type === CanvasSyncType.VECTOR) {
-        const contents = await db
-          .select({ update: CanvasContents.update, vector: CanvasContents.vector })
-          .from(CanvasContents)
-          .where(eq(CanvasContents.canvasId, input.canvasId))
-          .then(firstOrThrow);
-
-        const update = Y.diffUpdateV2(contents.update, Uint8Array.fromBase64(input.data));
-
-        pubsub.publish('canvas:sync', input.canvasId, {
-          target: input.clientId,
-          type: CanvasSyncType.UPDATE,
-          data: update.toBase64(),
-        });
-
-        pubsub.publish('canvas:sync', input.canvasId, {
-          target: input.clientId,
-          type: CanvasSyncType.VECTOR,
-          data: contents.vector.toBase64(),
-        });
-      } else if (input.type === CanvasSyncType.AWARENESS) {
-        pubsub.publish('canvas:sync', input.canvasId, {
-          target: `!${input.clientId}`,
-          type: CanvasSyncType.AWARENESS,
-          data: input.data,
-        });
-      }
-
-      return true;
-    },
-  }),
-}));
-
-/**
- * * Subscriptions
- */
-
-builder.subscriptionFields((t) => ({
-  canvasSyncStream: t.withAuth({ session: true }).field({
-    type: t.builder.simpleObject('CanvasSyncStreamPayload', {
-      fields: (t) => ({
-        canvasId: t.id(),
-        type: t.field({ type: CanvasSyncType }),
-        data: t.string(),
-      }),
-    }),
-    args: {
-      clientId: t.arg.string(),
-      canvasId: t.arg.id({ validate: validateDbId(TableCode.CANVASES) }),
-    },
-    subscribe: async (_, args, ctx) => {
-      const canvas = await db
-        .select({ siteId: Entities.siteId, availability: Entities.availability })
-        .from(Canvases)
-        .innerJoin(Entities, eq(Canvases.entityId, Entities.id))
-        .where(eq(Canvases.id, args.canvasId))
-        .then(firstOrThrow);
-
-      if (canvas.availability === EntityAvailability.PRIVATE) {
-        await assertSitePermission({
-          userId: ctx.session.userId,
-          siteId: canvas.siteId,
-        });
-      }
-
-      pubsub.publish('canvas:sync', args.canvasId, {
-        target: `!${args.clientId}`,
-        type: CanvasSyncType.PRESENCE,
-        data: '',
-      });
-
-      const repeater = Repeater.merge([
-        pubsub.subscribe('canvas:sync', args.canvasId),
-        new Repeater<{ target: string; type: CanvasSyncType; data: string }>(async (push, stop) => {
-          const heartbeat = () => {
-            push({
-              target: args.clientId,
-              type: CanvasSyncType.HEARTBEAT,
-              data: dayjs().toISOString(),
-            });
-          };
-
-          heartbeat();
-          const interval = setInterval(heartbeat, 1000);
-
-          await stop;
-
-          clearInterval(interval);
-        }),
-      ]);
-
-      return pipe(
-        repeater,
-        filter(({ target }) => {
-          if (target === '*') {
-            return true;
-          } else if (target.startsWith('!')) {
-            return target.slice(1) !== args.clientId;
-          } else {
-            return target === args.clientId;
-          }
-        }),
-      );
-    },
-    resolve: async (payload, args) => {
-      return {
-        canvasId: args.canvasId,
-        type: payload.type,
-        data: payload.data,
-      };
     },
   }),
 }));
