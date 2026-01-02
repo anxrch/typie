@@ -1,9 +1,8 @@
 import { and, asc, eq, getTableColumns } from 'drizzle-orm';
-import * as Y from 'yjs';
 import { db, Entities, first, Folders, PostContents, Posts } from '@/db';
 import { EntityState, EntityVisibility } from '@/enums';
 import { schema } from '@/pm';
-import { generateActivityImage, generateRandomName, makeYDoc } from '@/utils';
+import { generateActivityImage, generateRandomName } from '@/utils';
 import { builder } from '../builder';
 import { PostView } from '../objects';
 
@@ -30,10 +29,8 @@ builder.queryFields((t) => ({
     type: builder.simpleObject('Welcome', {
       fields: (t) => ({
         body: t.field({ type: 'JSON' }),
-        update: t.field({ type: 'Binary' }),
         name: t.string(),
         bodyMobile: t.field({ type: 'JSON' }),
-        updateMobile: t.field({ type: 'Binary' }),
       }),
     }),
     resolve: async () => {
@@ -46,9 +43,6 @@ builder.queryFields((t) => ({
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const body = content?.body ?? schema.topNodeType.createAndFill()!.toJSON();
 
-      const yDoc = makeYDoc({ body });
-      const update = Y.encodeStateAsUpdateV2(yDoc);
-
       const name = generateRandomName();
 
       const contentMobile = await db
@@ -60,15 +54,10 @@ builder.queryFields((t) => ({
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const bodyMobile = contentMobile?.body ?? schema.topNodeType.createAndFill()!.toJSON();
 
-      const yDocMobile = makeYDoc({ body: bodyMobile });
-      const updateMobile = Y.encodeStateAsUpdateV2(yDocMobile);
-
       return {
         body,
-        update,
         name,
         bodyMobile,
-        updateMobile,
       };
     },
   }),
