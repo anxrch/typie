@@ -13,7 +13,6 @@ import 'package:typie/icons/lucide_light.dart';
 import 'package:typie/icons/typie.dart';
 import 'package:typie/routers/app.gr.dart';
 import 'package:typie/screens/home/__generated__/create_post.req.gql.dart';
-import 'package:typie/screens/home/__generated__/site_update_stream.req.gql.dart';
 import 'package:typie/services/preference.dart';
 import 'package:typie/widgets/responsive_container.dart';
 import 'package:typie/widgets/tappable.dart';
@@ -27,14 +26,6 @@ class HomeScreen extends HookWidget {
     final client = useService<GraphQLClient>();
     final pref = useService<Pref>();
     final mixpanel = useService<Mixpanel>();
-
-    useEffect(() {
-      final subscription = client
-          .subscribe(GHomeScreen_SiteUpdateStream_SubscriptionReq((b) => b..vars.siteId = pref.siteId))
-          .listen((_) {});
-
-      return subscription.cancel;
-    }, []);
 
     return AutoTabsRouter(
       routes: const [EntityRouter(), NotesRoute(), SearchRoute(), ProfileRoute()],
