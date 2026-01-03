@@ -2,7 +2,6 @@
   import { css } from '@typie/styled-system/css';
   import { center, flex } from '@typie/styled-system/patterns';
   import { HorizontalDivider, Icon, MenuItem } from '@typie/ui/components';
-  import { getAppContext } from '@typie/ui/context';
   import { Dialog, Toast } from '@typie/ui/notification';
   import mixpanel from 'mixpanel-browser';
   import { onMount } from 'svelte';
@@ -16,7 +15,6 @@
   import { getTreeContext } from '../state.svelte';
   import type { TreeEntity } from './types';
 
-  const app = getAppContext();
   const tree = getTreeContext();
 
   const deleteEntities = graphql(`
