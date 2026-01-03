@@ -1046,7 +1046,7 @@
 
             {#if showTimeline}
               <div class={css({ position: 'absolute', inset: '0', backgroundColor: 'surface.default' })}>
-                <Timeline $post={$query.entity.node} {doc} />
+                <Timeline $post={$query.entity.node} />
               </div>
             {/if}
           </div>

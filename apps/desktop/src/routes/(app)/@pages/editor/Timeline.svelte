@@ -3,26 +3,20 @@
   import { flex } from '@typie/styled-system/patterns';
   import { createFloatingActions, portal } from '@typie/ui/actions';
   import { Icon, RingSpinner } from '@typie/ui/components';
-  import { TiptapEditor } from '@typie/ui/tiptap';
-  import { clamp, Ref } from '@typie/ui/utils';
+  import { clamp } from '@typie/ui/utils';
   import dayjs from 'dayjs';
-  import { base64 } from 'rfc4648';
   import { untrack } from 'svelte';
   import { fly } from 'svelte/transition';
-  import * as Y from 'yjs';
   import IconClockFading from '~icons/lucide/clock-fading';
   import { fragment, graphql } from '$graphql';
-  import { YState } from './state.svelte';
-  import type { Editor } from '@tiptap/core';
   import type { PointerEventHandler } from 'svelte/elements';
   import type { Editor_Timeline_post } from '$graphql';
 
   type Props = {
     $post: Editor_Timeline_post;
-    doc: Y.Doc;
   };
 
-  let { $post: _post, doc }: Props = $props();
+  let { $post: _post }: Props = $props();
 
   const post = fragment(
     _post,
@@ -60,15 +54,11 @@
   });
 
   let value = $state(0);
-  let editor = $state<Ref<Editor>>();
   let showTooltip = $state(false);
 
-  const baseDoc = new Y.Doc({ gc: false });
-  const viewDoc = new Y.Doc({ gc: false });
-
-  const title = new YState<string>(viewDoc, 'title', '');
-  const subtitle = new YState<string>(viewDoc, 'subtitle', '');
-  const maxWidth = new YState<number>(viewDoc, 'maxWidth', 800);
+  const title = $state('');
+  const subtitle = $state('');
+  const maxWidth = $state(800);
 
   const max = $derived($query ? $query.post.snapshots.length - 1 : 0);
   const p = $derived(max > 0 ? `${(value / max) * 100}%` : '0%');
@@ -77,58 +67,13 @@
 
   const initialize = async () => {
     const resp = await query.load({ slug: $post.entity.slug });
-
-    Y.applyUpdateV2(baseDoc, base64.parse(resp.post.update));
     value = resp.post.snapshots.length - 1;
-
     initialized = true;
   };
 
   $effect(() => {
     untrack(() => initialize());
   });
-
-  $effect(() => {
-    if (!$query || !initialized) {
-      return;
-    }
-
-    const snapshot = Y.decodeSnapshotV2(base64.parse($query.post.snapshots[value].snapshot));
-    const snapshotDoc = Y.createDocFromSnapshot(baseDoc, snapshot);
-
-    const currentStateVector = Y.encodeStateVector(viewDoc);
-    const snapshotStateVector = Y.encodeStateVector(snapshotDoc);
-
-    const missingUpdate = Y.encodeStateAsUpdateV2(viewDoc, snapshotStateVector);
-
-    const undoManager = new Y.UndoManager(snapshotDoc, { trackedOrigins: new Set(['snapshot']) });
-    Y.applyUpdateV2(snapshotDoc, missingUpdate, 'snapshot');
-    undoManager.undo();
-
-    const revertUpdate = Y.encodeStateAsUpdateV2(snapshotDoc, currentStateVector);
-    Y.applyUpdateV2(viewDoc, revertUpdate, 'snapshot');
-  });
-
-  const restore = () => {
-    if (!$query) {
-      return;
-    }
-
-    const snapshot = Y.decodeSnapshotV2(base64.parse($query.post.snapshots[value].snapshot));
-    const snapshotDoc = Y.createDocFromSnapshot(baseDoc, snapshot);
-
-    const currentStateVector = Y.encodeStateVector(doc);
-    const snapshotStateVector = Y.encodeStateVector(snapshotDoc);
-
-    const missingUpdate = Y.encodeStateAsUpdateV2(doc, snapshotStateVector);
-
-    const undoManager = new Y.UndoManager(snapshotDoc, { trackedOrigins: new Set(['snapshot']) });
-    Y.applyUpdateV2(snapshotDoc, missingUpdate, 'snapshot');
-    undoManager.undo();
-
-    const revertUpdate = Y.encodeStateAsUpdateV2(snapshotDoc, currentStateVector);
-    Y.applyUpdateV2(doc, revertUpdate, 'snapshot');
-  };
 
   const handler: PointerEventHandler<HTMLElement> = (e) => {
     if (!e.currentTarget.parentElement || !$query) {
@@ -145,7 +90,7 @@
 <div class={flex({ flexGrow: '1', overflowY: 'hidden' })}>
   <div class={css({ position: 'relative', flexGrow: '1', height: 'full', overflowY: 'auto', scrollbarGutter: 'stable' })}>
     <div
-      style:--prosemirror-max-width={`${maxWidth.current}px`}
+      style:--prosemirror-max-width={`${maxWidth}px`}
       class={flex({
         flexDirection: 'column',
         alignItems: 'center',
@@ -162,7 +107,7 @@
           readonly
           rows={1}
           spellcheck="false"
-          value={title.current}
+          value={title}
         ></textarea>
 
         <textarea
@@ -172,14 +117,20 @@
           readonly
           rows={1}
           spellcheck="false"
-          value={subtitle.current}
+          value={subtitle}
         ></textarea>
 
         <div class={css({ marginTop: '10px', marginBottom: '20px', borderBottomWidth: '1px', borderColor: 'gray.200' })}></div>
       </div>
 
       <div class={css({ position: 'relative', flexGrow: '1', width: 'full' })}>
-        <TiptapEditor style={css.raw({ size: 'full' })} doc={viewDoc} editable={false} bind:editor />
+        <div class={css({ padding: '20px', color: 'gray.500', textAlign: 'center' })}>
+          {#if initialized && $query}
+            스냅샷 내용 표시
+          {:else}
+            로딩 중...
+          {/if}
+        </div>
       </div>
     </div>
   </div>
@@ -329,37 +280,6 @@
         use:arrow
       ></div>
     </div>
-
-    <button
-      class={css({
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        paddingX: '14px',
-        paddingY: '8px',
-        backgroundColor: 'gray.900',
-        color: 'white',
-        borderRadius: '8px',
-        fontSize: '13px',
-        fontWeight: 'medium',
-        cursor: 'pointer',
-        transition: 'all',
-        transitionDuration: '150ms',
-        _hover: {
-          backgroundColor: 'gray.800',
-          transform: 'translateY(-1px)',
-        },
-        _active: {
-          backgroundColor: 'black',
-          transform: 'translateY(0)',
-        },
-      })}
-      onclick={restore}
-      type="button"
-    >
-      <Icon style={css.raw({ size: '14px' })} icon={IconClockFading} />
-      복원
-    </button>
   {:else}
     <div class={flex({ justify: 'center', align: 'center', width: '420px', height: '36px' })}>
       <RingSpinner style={css.raw({ size: '18px', color: 'gray.500' })} />
