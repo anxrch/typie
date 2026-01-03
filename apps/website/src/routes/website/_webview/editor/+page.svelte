@@ -29,7 +29,6 @@
   import FindReplace from './FindReplace.svelte';
   import Highlight from './Highlight.svelte';
   import Limit from './Limit.svelte';
-  import Spellcheck from './Spellcheck.svelte';
   import { YState } from './state.svelte';
   import type { Editor } from '@tiptap/core';
   import type { PageLayout, PageLayoutPreset, Ref } from '@typie/ui/utils';
@@ -1231,7 +1230,6 @@
           <Highlight {editor} scale={editorScale} />
         {/if}
         <Limit {$query} {editor} />
-        <Spellcheck {editor} />
         <FindReplace {editor} />
         <Anchors {doc} {editor} />
       {/if}
