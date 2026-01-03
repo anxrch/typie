@@ -12,7 +12,7 @@
     updatedAt: string;
   };
 
-  const notes = $state<Note[]>([]);
+  let notes = $state<Note[]>([]);
   let selectedId: string | null = null;
   let editorTitle = '';
   let editorContent = '';
@@ -32,7 +32,7 @@
   const saveCurrent = async () => {
     if (!selectedId) return;
 
-    const updatedAt = new Date().toISOString();
+    let updatedAt = new Date().toISOString();
     notes = notes.map((note) =>
       note.id === selectedId
         ? {
