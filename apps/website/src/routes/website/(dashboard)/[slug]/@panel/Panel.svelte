@@ -9,7 +9,6 @@
   import PanelBodySettings from './PanelBodySettings.svelte';
   import PanelInfo from './PanelInfo.svelte';
   import PanelNote from './PanelNote.svelte';
-  import PanelSpellcheck from './PanelSpellcheck.svelte';
   import PanelTimeline from './PanelTimeline.svelte';
   import type { Editor } from '@tiptap/core';
   import type { Ref } from '@typie/ui/utils';
@@ -34,7 +33,6 @@
         id
 
         ...Editor_Panel_PanelInfo_user
-        ...Editor_Panel_PanelSpellcheck_user
       }
     `),
   );
@@ -160,10 +158,6 @@
 
     {#if app.preference.current.panelTabByViewId[splitViewId] === 'anchors'}
       <PanelAnchors {editor} />
-    {/if}
-
-    {#if app.preference.current.panelTabByViewId[splitViewId] === 'spellcheck'}
-      <PanelSpellcheck {$user} {editor} />
     {/if}
 
     {#if app.preference.current.panelTabByViewId[splitViewId] === 'timeline'}

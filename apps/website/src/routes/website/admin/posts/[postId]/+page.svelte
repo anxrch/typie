@@ -66,12 +66,6 @@
       }
     }
   `);
-
-  const adminEnqueuePostCompact = graphql(`
-    mutation AdminPostDetail_AdminEnqueuePostCompact_Mutation($input: AdminEnqueuePostCompactInput!) {
-      adminEnqueuePostCompact(input: $input)
-    }
-  `);
 </script>
 
 {#if $query.adminPost}
@@ -475,18 +469,9 @@
                 color: 'gray.900',
               },
             })}
-            onclick={() =>
-              adminEnqueuePostCompact({ postId: $query.adminPost.id }).then(
-                () => {
-                  alert('Compact Enqueue OK');
-                },
-                (err) => {
-                  alert(`Compact Enqueue Error: ${err.message}`);
-                },
-              )}
             type="button"
           >
-            ENQUEUE COMPACT
+            DELETE POST
           </button>
         </div>
       </div>
