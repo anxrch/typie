@@ -1,3 +1,4 @@
+// cspell:disable
 import { describe, expect, it, mock } from 'bun:test';
 import { check } from './spellcheck';
 

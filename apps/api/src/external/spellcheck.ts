@@ -84,6 +84,7 @@ type NormalizedError = {
   type: (typeof errorTypes)[number];
 };
 
+// cspell:disable
 const offlineCorrections: Record<string, string[]> = {
   accomodate: ['accommodate'],
   adress: ['address'],
@@ -113,6 +114,7 @@ const offlineCorrections: Record<string, string[]> = {
   wierd: ['weird'],
   writting: ['writing'],
 };
+// cspell:enable
 
 const spacingPattern = /\s{2,}/g;
 const wordPattern = /\b([A-Za-z][A-Za-z']+)\b/g;
@@ -255,8 +257,8 @@ const getCachedValue = async (key: string, cache: CacheClient) => {
   try {
     const cached = await cache.get(key);
     if (cached) return cached;
-  } catch (error) {
-    Sentry.captureException(error);
+  } catch (err) {
+    Sentry.captureException(err);
   }
 
   return memoryCache.get(key) ?? null;
@@ -267,8 +269,8 @@ const setCachedValue = async (key: string, value: string, cache: CacheClient) =>
 
   try {
     await cache.setex(key, CACHE_TTL_SECONDS, value);
-  } catch (error) {
-    Sentry.captureException(error);
+  } catch (err) {
+    Sentry.captureException(err);
   }
 };
 
@@ -278,8 +280,8 @@ const getCachedErrors = async (key: string, cache: CacheClient) => {
 
   try {
     return JSON.parse(cached) as NormalizedError[];
-  } catch (error) {
-    Sentry.captureException(error);
+  } catch (err) {
+    Sentry.captureException(err);
     return null;
   }
 };

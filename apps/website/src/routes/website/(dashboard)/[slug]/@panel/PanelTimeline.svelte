@@ -26,6 +26,7 @@
   import { getViewContext } from '../@split-view/context.svelte';
   import type { Editor } from '@tiptap/core';
   import type { PageLayout, Ref } from '@typie/ui/utils';
+  import type { Node } from '@tiptap/pm/model';
   import type { Action } from 'svelte/action';
   import type { PointerEventHandler } from 'svelte/elements';
   import type { Editor_Panel_PanelTimeline_post } from '$graphql';
@@ -34,11 +35,9 @@
     $post: Editor_Panel_PanelTimeline_post;
     editor?: Ref<Editor>;
     viewEditor?: Ref<Editor>;
-    doc: Y.Doc;
-    viewDoc?: Y.Doc;
   };
 
-  let { $post: _post, editor, viewEditor, doc, viewDoc = $bindable() }: Props = $props();
+  let { $post: _post, editor, viewEditor }: Props = $props();
 
   const post = fragment(
     _post,
@@ -79,7 +78,6 @@
   let isLoading = $state(true);
   let baseDoc: Y.Doc | null = null;
   let snapshotCharCounts = $state<Record<string, number>>({});
-  let internalViewDoc = $state<Y.Doc>();
 
   const snapshots = $derived($query?.post.snapshots ?? []);
 
@@ -116,10 +114,7 @@
   const p = $derived(max > 0 && sliderIndex >= 0 ? `${(sliderIndex / max) * 100}%` : '100%');
 
   // NOTE: 서버와 동일한 글자수 세기 로직
-  const getCharacterCount = (doc: Y.Doc): number => {
-    const xmlFragment = doc.getXmlFragment('body');
-    const node = yXmlFragmentToProseMirrorRootNode(xmlFragment, schema);
-
+  const getCharacterCount = (node: Node): number => {
     const text = getText(node, {
       blockSeparator: '\n',
       textSerializers,
@@ -151,7 +146,8 @@
           const snapshot = snapshots[currentIndex];
           const snapshotData = Y.decodeSnapshotV2(Uint8Array.fromBase64(snapshot.snapshot));
           const snapshotDoc = Y.createDocFromSnapshot(baseDoc, snapshotData);
-          counts[snapshot.id] = getCharacterCount(snapshotDoc);
+          const node = yXmlFragmentToProseMirrorRootNode(snapshotDoc.getXmlFragment('body'), schema);
+          counts[snapshot.id] = getCharacterCount(node);
           currentIndex++;
 
           snapshotCharCounts = { ...counts };
@@ -176,7 +172,8 @@
             const snapshot = snapshots[currentIndex];
             const snapshotData = Y.decodeSnapshotV2(Uint8Array.fromBase64(snapshot.snapshot));
             const snapshotDoc = Y.createDocFromSnapshot(baseDoc, snapshotData);
-            counts[snapshot.id] = getCharacterCount(snapshotDoc);
+            const node = yXmlFragmentToProseMirrorRootNode(snapshotDoc.getXmlFragment('body'), schema);
+            counts[snapshot.id] = getCharacterCount(node);
             currentIndex++;
           }
 
@@ -206,10 +203,6 @@
       if (editorContext) {
         editorContext.timeline = false;
       }
-      viewDoc?.destroy();
-      viewDoc = undefined;
-      internalViewDoc?.destroy();
-      internalViewDoc = undefined;
       baseDoc?.destroy();
       baseDoc = null;
       updateViewDoc.cancel();
@@ -229,35 +222,18 @@
   });
 
   const updateViewDoc = throttle((snapshotId: string) => {
-    if (!baseDoc || !$query) return;
+    if (!baseDoc || !$query || !viewEditor?.current) return;
 
     const snapshot = $query.post.snapshots.find((s) => s.id === snapshotId);
     if (!snapshot) return;
 
-    if (!internalViewDoc) {
-      internalViewDoc = new Y.Doc({ gc: false });
-    }
-
     const snapshotData = Y.decodeSnapshotV2(Uint8Array.fromBase64(snapshot.snapshot));
     const snapshotDoc = Y.createDocFromSnapshot(baseDoc, snapshotData);
+    const node = yXmlFragmentToProseMirrorRootNode(snapshotDoc.getXmlFragment('body'), schema);
 
-    const currentStateVector = Y.encodeStateVector(internalViewDoc);
-    const snapshotStateVector = Y.encodeStateVector(snapshotDoc);
-
-    const missingUpdate = Y.encodeStateAsUpdateV2(internalViewDoc, snapshotStateVector);
-
-    const undoManager = new Y.UndoManager(snapshotDoc, { trackedOrigins: new Set(['snapshot']) });
-    Y.applyUpdateV2(snapshotDoc, missingUpdate, 'snapshot');
-    undoManager.undo();
-
-    const revertUpdate = Y.encodeStateAsUpdateV2(snapshotDoc, currentStateVector);
-    Y.applyUpdateV2(internalViewDoc, revertUpdate, 'snapshot');
-
-    viewDoc?.destroy();
-    viewDoc = undefined;
-    // NOTE: 에디터 완전히 리렌더링. doc이 바뀌어도 특정 스냅샷이 prosemirror에 제대로 리렌더링되지 않는 버그가 있음.
+    // NOTE: 에디터 완전히 리렌더링. 컨텐츠가 바뀌어도 특정 스냅샷이 prosemirror에 제대로 리렌더링되지 않는 버그가 있음.
     tick().then(() => {
-      viewDoc = internalViewDoc;
+      viewEditor.current?.commands.setContent(node.toJSON());
 
       untrack(() => {
         tick().then(() => {
@@ -292,24 +268,15 @@
   };
 
   const restore = () => {
-    if (!$query || !baseDoc) {
+    if (!$query || !baseDoc || !editor?.current) {
       return;
     }
 
     const snapshot = Y.decodeSnapshotV2(Uint8Array.fromBase64($query.post.snapshots[sliderIndex].snapshot));
     const snapshotDoc = Y.createDocFromSnapshot(baseDoc, snapshot);
+    const node = yXmlFragmentToProseMirrorRootNode(snapshotDoc.getXmlFragment('body'), schema);
 
-    const currentStateVector = Y.encodeStateVector(doc);
-    const snapshotStateVector = Y.encodeStateVector(snapshotDoc);
-
-    const missingUpdate = Y.encodeStateAsUpdateV2(doc, snapshotStateVector);
-
-    const undoManager = new Y.UndoManager(snapshotDoc, { trackedOrigins: new Set(['snapshot']) });
-    Y.applyUpdateV2(snapshotDoc, missingUpdate, 'snapshot');
-    undoManager.undo();
-
-    const revertUpdate = Y.encodeStateAsUpdateV2(snapshotDoc, currentStateVector);
-    Y.applyUpdateV2(doc, revertUpdate, 'snapshot');
+    editor.current.commands.setContent(node.toJSON());
 
     app.preference.current.panelExpandedByViewId[view.id] = false;
     Toast.success(`${dayjs($query.post.snapshots[sliderIndex]?.createdAt).formatAsSmart()} 시점으로 복원되었습니다`);
