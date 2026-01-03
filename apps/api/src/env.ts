@@ -1,73 +1,75 @@
 import { z } from 'zod';
 
-const schema = z.object({
-  ANTHROPIC_API_KEY: z.string(),
-  APPLE_APP_APPLE_ID: z.coerce.number(),
-  APPLE_APP_BUNDLE_ID: z.string(),
-  APPLE_IAP_ISSUER_ID: z.string(),
-  APPLE_IAP_KEY_ID: z.string(),
-  APPLE_IAP_PRIVATE_KEY: z.string(),
-  APPLE_SIGN_IN_KEY_ID: z.string(),
-  APPLE_SIGN_IN_PRIVATE_KEY: z.string(),
-  APPLE_TEAM_ID: z.string(),
-  AUTH_URL: z.string(),
-  DATABASE_URL: z.string(),
-  GITHUB_TOKEN: z.string(),
-  GOOGLE_OAUTH_CLIENT_ID: z.string(),
-  GOOGLE_OAUTH_CLIENT_SECRET: z.string(),
-  GOOGLE_PLAY_PACKAGE_NAME: z.string(),
-  GOOGLE_SERVICE_ACCOUNT: z.string().optional(),
-  IFRAMELY_API_KEY: z.string(),
-  KAKAO_CLIENT_ID: z.string(),
-  KAKAO_CLIENT_SECRET: z.string(),
-  LISTEN_PORT: z.coerce.number().optional(),
-  MEILISEARCH_API_KEY: z.string(),
-  MEILISEARCH_URL: z.string(),
-  NAVER_CLIENT_ID: z.string(),
-  NAVER_CLIENT_SECRET: z.string(),
-  OIDC_CLIENT_ID: z.string(),
-  OIDC_CLIENT_SECRET: z.string(),
-  OIDC_JWK: z.string(),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
-  PORTONE_API_SECRET: z.string(),
-  PORTONE_CHANNEL_KEY: z.string(),
-  REDIS_URL: z.string(),
-  SENTRY_DSN: z.string().optional(),
-  SLACK_BOT_TOKEN: z.string(),
-  SLACK_SIGNING_SECRET: z.string(),
-  SLACK_WEBHOOK_URL: z.string(),
-  PUSH_NOTIFICATIONS_ENABLED: z.coerce.boolean().optional().default(true),
-  SPELLCHECK_API_KEY: z.string().optional(),
-  SPELLCHECK_OFFLINE: z.coerce.boolean().optional().default(false),
-  SPELLCHECK_URL: z.string().optional(),
-  USERSITE_URL: z.string(),
-  WEBSITE_URL: z.string(),
-}).superRefine((value, ctx) => {
-  if (!value.SPELLCHECK_OFFLINE) {
-    if (!value.SPELLCHECK_API_KEY) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['SPELLCHECK_API_KEY'],
-        message: 'SPELLCHECK_API_KEY is required unless SPELLCHECK_OFFLINE is enabled',
-      });
+const schema = z
+  .object({
+    ANTHROPIC_API_KEY: z.string(),
+    APPLE_APP_APPLE_ID: z.coerce.number(),
+    APPLE_APP_BUNDLE_ID: z.string(),
+    APPLE_IAP_ISSUER_ID: z.string(),
+    APPLE_IAP_KEY_ID: z.string(),
+    APPLE_IAP_PRIVATE_KEY: z.string(),
+    APPLE_SIGN_IN_KEY_ID: z.string(),
+    APPLE_SIGN_IN_PRIVATE_KEY: z.string(),
+    APPLE_TEAM_ID: z.string(),
+    AUTH_URL: z.string(),
+    DATABASE_URL: z.string(),
+    GITHUB_TOKEN: z.string(),
+    GOOGLE_OAUTH_CLIENT_ID: z.string(),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string(),
+    GOOGLE_PLAY_PACKAGE_NAME: z.string(),
+    GOOGLE_SERVICE_ACCOUNT: z.string().optional(),
+    IFRAMELY_API_KEY: z.string(),
+    KAKAO_CLIENT_ID: z.string(),
+    KAKAO_CLIENT_SECRET: z.string(),
+    LISTEN_PORT: z.coerce.number().optional(),
+    MEILISEARCH_API_KEY: z.string(),
+    MEILISEARCH_URL: z.string(),
+    NAVER_CLIENT_ID: z.string(),
+    NAVER_CLIENT_SECRET: z.string(),
+    OIDC_CLIENT_ID: z.string(),
+    OIDC_CLIENT_SECRET: z.string(),
+    OIDC_JWK: z.string(),
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+    PORTONE_API_SECRET: z.string(),
+    PORTONE_CHANNEL_KEY: z.string(),
+    REDIS_URL: z.string(),
+    SENTRY_DSN: z.string().optional(),
+    SLACK_BOT_TOKEN: z.string(),
+    SLACK_SIGNING_SECRET: z.string(),
+    SLACK_WEBHOOK_URL: z.string(),
+    PUSH_NOTIFICATIONS_ENABLED: z.coerce.boolean().optional().default(true),
+    SPELLCHECK_API_KEY: z.string().optional(),
+    SPELLCHECK_OFFLINE: z.coerce.boolean().optional().default(false),
+    SPELLCHECK_URL: z.string().optional(),
+    USERSITE_URL: z.string(),
+    WEBSITE_URL: z.string(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.SPELLCHECK_OFFLINE) {
+      if (!value.SPELLCHECK_API_KEY) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SPELLCHECK_API_KEY'],
+          message: 'SPELLCHECK_API_KEY is required unless SPELLCHECK_OFFLINE is enabled',
+        });
+      }
+      if (!value.SPELLCHECK_URL) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SPELLCHECK_URL'],
+          message: 'SPELLCHECK_URL is required unless SPELLCHECK_OFFLINE is enabled',
+        });
+      }
     }
-    if (!value.SPELLCHECK_URL) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['SPELLCHECK_URL'],
-        message: 'SPELLCHECK_URL is required unless SPELLCHECK_OFFLINE is enabled',
-      });
-    }
-  }
 
-  if (value.PUSH_NOTIFICATIONS_ENABLED && !value.GOOGLE_SERVICE_ACCOUNT) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['GOOGLE_SERVICE_ACCOUNT'],
-      message: 'GOOGLE_SERVICE_ACCOUNT is required when push notifications are enabled',
-    });
-  }
-});
+    if (value.PUSH_NOTIFICATIONS_ENABLED && !value.GOOGLE_SERVICE_ACCOUNT) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['GOOGLE_SERVICE_ACCOUNT'],
+        message: 'GOOGLE_SERVICE_ACCOUNT is required when push notifications are enabled',
+      });
+    }
+  });
 
 export const env = schema.parse(process.env.ENV_JSON ? JSON.parse(process.env.ENV_JSON) : process.env);
 export const stack = process.env.PUBLIC_ENVIRONMENT ?? process.env.DOPPLER_ENVIRONMENT ?? 'local';

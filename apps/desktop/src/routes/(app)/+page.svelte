@@ -238,9 +238,7 @@
       ></textarea>
 
       <div class={flex({ justifyContent: 'space-between', alignItems: 'center' })}>
-        <div class={css({ color: 'gray.600', fontSize: '13px' })}>
-          변경 사항은 기기 안에 저장되며, 인터넷 없이도 계속 편집할 수 있어요.
-        </div>
+        <div class={css({ color: 'gray.600', fontSize: '13px' })}>변경 사항은 기기 안에 저장되며, 인터넷 없이도 계속 편집할 수 있어요.</div>
 
         <div class={flex({ gap: '8px' })}>
           <button
@@ -281,9 +279,7 @@
     {:else}
       <div class={center({ flexDirection: 'column', gap: '12px', height: 'full' })}>
         <h2 class={css({ fontSize: '20px', fontWeight: 'bold' })}>불러올 노트가 없어요</h2>
-        <p class={css({ color: 'gray.600', fontSize: '14px', textAlign: 'center' })}>
-          새 노트를 만들어 오프라인으로 바로 작성해보세요.
-        </p>
+        <p class={css({ color: 'gray.600', fontSize: '14px', textAlign: 'center' })}>새 노트를 만들어 오프라인으로 바로 작성해보세요.</p>
         <button
           class={css({
             padding: '10px 16px',
