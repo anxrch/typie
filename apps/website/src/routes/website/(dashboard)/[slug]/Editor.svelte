@@ -15,7 +15,6 @@
   import { nanoid } from 'nanoid';
   import { untrack } from 'svelte';
   import { on } from 'svelte/events';
-  import { match } from 'ts-pattern';
   import { IndexeddbPersistence } from 'y-indexeddb';
   import { defaultDeleteFilter, defaultProtectedNodes, ySyncPluginKey } from 'y-prosemirror';
   import * as Y from 'yjs';
@@ -26,7 +25,6 @@
   import FolderIcon from '~icons/lucide/folder';
   import Maximize2Icon from '~icons/lucide/maximize-2';
   import XIcon from '~icons/lucide/x';
-  import { browser } from '$app/environment';
   import { fragment, graphql } from '$graphql';
   import { unfurlEmbed, uploadBlobAsFile, uploadBlobAsImage } from '$lib/utils';
   import PostMenu from '../@context-menu/PostMenu.svelte';
@@ -1119,7 +1117,7 @@
           </div>
         {/if}
 
-        <Panel $post={entity.node} $user={$query.me} {doc} {editor} {viewEditor} bind:viewDoc />
+        <Panel $post={entity.node} $user={$query.me} {editor} {viewEditor} />
       </div>
     </div>
   </div>

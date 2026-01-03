@@ -22,24 +22,21 @@
   import RulerDimensionLineIcon from '~icons/lucide/ruler-dimension-line';
   import TableIcon from '~icons/lucide/table';
   import TypeIcon from '~icons/lucide/type';
-  import { YState } from '../state.svelte';
   import type { Editor } from '@tiptap/core';
   import type { PageLayout, PageLayoutPreset, Ref } from '@typie/ui/utils';
-  import type * as Y from 'yjs';
 
   type Props = {
     editor?: Ref<Editor>;
-    doc: Y.Doc;
   };
 
-  let { editor, doc }: Props = $props();
+  let { editor }: Props = $props();
 
   const app = getAppContext();
-  const maxWidth = new YState<number>(doc, 'maxWidth', 800);
-  const pageLayout = new YState<PageLayout | undefined>(doc, 'pageLayout', undefined);
-  const layoutMode = new YState<PostLayoutMode>(doc, 'layoutMode', PostLayoutMode.SCROLL);
+  let maxWidth = $state(800);
+  let pageLayout = $state<PageLayout | undefined>();
+  let layoutMode = $state<PostLayoutMode>(PostLayoutMode.SCROLL);
 
-  const isPageLayoutEnabled = $derived(layoutMode.current === PostLayoutMode.PAGE);
+  const isPageLayoutEnabled = $derived(layoutMode === PostLayoutMode.PAGE);
 
   const getBlockInfo = (blockType: string) => {
     const blockInfo: Record<string, { name: string; icon: typeof QuoteIcon }> = {
@@ -77,10 +74,10 @@
           }
 
           editor.current.chain().focus().convertIncompatibleBlocks().run();
-          layoutMode.current = value;
+          layoutMode = value;
 
-          if (value === PostLayoutMode.PAGE && !pageLayout.current) {
-            pageLayout.current = createDefaultPageLayout('a4');
+          if (value === PostLayoutMode.PAGE && !pageLayout) {
+            pageLayout = createDefaultPageLayout('a4');
           }
 
           mixpanel.track('toggle_post_page_layout', {
@@ -89,9 +86,9 @@
         },
       });
     } else {
-      layoutMode.current = value;
-      if (value === PostLayoutMode.PAGE && !pageLayout.current) {
-        pageLayout.current = createDefaultPageLayout('a4');
+      layoutMode = value;
+      if (value === PostLayoutMode.PAGE && !pageLayout) {
+        pageLayout = createDefaultPageLayout('a4');
       }
       mixpanel.track('toggle_post_page_layout', {
         enabled: value,
@@ -163,12 +160,12 @@
           ]}
           onselect={handlePageLayoutToggle}
           size="sm"
-          value={layoutMode.current}
+          value={layoutMode}
         />
       </div>
     </div>
 
-    {#if isPageLayoutEnabled && pageLayout.current}
+    {#if isPageLayoutEnabled && pageLayout}
       <div class={flex({ flexDirection: 'column', gap: '6px', paddingX: '20px' })}>
         <div class={flex({ alignItems: 'center', gap: '8px' })}>
           <Icon style={css.raw({ color: 'text.faint' })} icon={FileIcon} />
@@ -177,12 +174,12 @@
         <Select
           items={PAGE_LAYOUT_OPTIONS}
           onselect={(value: PageLayoutPreset | 'custom') => {
-            if (pageLayout.current && value !== 'custom') {
-              pageLayout.current = createDefaultPageLayout(value);
+            if (pageLayout && value !== 'custom') {
+              pageLayout = createDefaultPageLayout(value);
             }
           }}
           value={(Object.entries(PAGE_SIZE_MAP).find(
-            ([, dimension]) => dimension.width === pageLayout.current?.width && dimension.height === pageLayout.current?.height,
+            ([, dimension]) => dimension.width === pageLayout?.width && dimension.height === pageLayout?.height,
           )?.[0] as PageLayoutPreset) ?? ('custom' as const)}
         />
         <div class={flex({ flexDirection: 'column', gap: '8px' })}>
@@ -193,18 +190,18 @@
                 style={css.raw({ width: '80px' })}
                 min="100"
                 onchange={(e) => {
-                  if (!pageLayout.current) return;
+                  if (!pageLayout) return;
                   const target = e.target as HTMLInputElement;
                   const value = Math.max(100, Number(target.value));
                   target.value = String(value);
-                  pageLayout.current = {
-                    ...pageLayout.current,
+                  pageLayout = {
+                    ...pageLayout,
                     width: value,
                   };
                 }}
                 size="sm"
                 type="number"
-                value={pageLayout.current.width}
+                value={pageLayout.width}
               />
             </div>
             <div class={flex({ flexDirection: 'column', alignItems: 'center', gap: '4px' })}>
@@ -213,18 +210,18 @@
                 style={css.raw({ width: '80px' })}
                 min="100"
                 onchange={(e) => {
-                  if (!pageLayout.current) return;
+                  if (!pageLayout) return;
                   const target = e.target as HTMLInputElement;
                   const value = Math.max(100, Number(target.value));
                   target.value = String(value);
-                  pageLayout.current = {
-                    ...pageLayout.current,
+                  pageLayout = {
+                    ...pageLayout,
                     height: value,
                   };
                 }}
                 size="sm"
                 type="number"
-                value={pageLayout.current.height}
+                value={pageLayout.height}
               />
             </div>
           </div>
@@ -241,91 +238,91 @@
             <div class={css({ fontSize: '12px', color: 'text.subtle', width: '32px' })}>상단</div>
             <TextInput
               style={css.raw({ width: '80px' })}
-              max={pageLayout.current ? String(getMaxMargin('top', pageLayout.current)) : undefined}
+              max={pageLayout ? String(getMaxMargin('top', pageLayout)) : undefined}
               min="0"
               oninput={(e) => {
-                if (!pageLayout.current) return;
+                if (!pageLayout) return;
                 const target = e.target as HTMLInputElement;
-                const value = clamp(Number(target.value), 0, getMaxMargin('top', pageLayout.current));
+                const value = clamp(Number(target.value), 0, getMaxMargin('top', pageLayout));
                 target.value = String(value);
-                pageLayout.current = {
-                  ...pageLayout.current,
+                pageLayout = {
+                  ...pageLayout,
                   marginTop: value,
                 };
               }}
               size="sm"
               type="number"
-              value={pageLayout.current?.marginTop ?? 25}
+              value={pageLayout?.marginTop ?? 25}
             />
           </div>
           <div class={flex({ flexDirection: 'column', alignItems: 'center', gap: '4px' })}>
             <div class={css({ fontSize: '12px', color: 'text.subtle', width: '32px' })}>하단</div>
             <TextInput
               style={css.raw({ width: '80px' })}
-              max={pageLayout.current ? String(getMaxMargin('bottom', pageLayout.current)) : undefined}
+              max={pageLayout ? String(getMaxMargin('bottom', pageLayout)) : undefined}
               min="0"
               oninput={(e) => {
-                if (!pageLayout.current) return;
+                if (!pageLayout) return;
                 const target = e.target as HTMLInputElement;
-                const value = clamp(Number(target.value), 0, getMaxMargin('bottom', pageLayout.current));
+                const value = clamp(Number(target.value), 0, getMaxMargin('bottom', pageLayout));
                 target.value = String(value);
-                pageLayout.current = {
-                  ...pageLayout.current,
+                pageLayout = {
+                  ...pageLayout,
                   marginBottom: value,
                 };
               }}
               size="sm"
               type="number"
-              value={pageLayout.current?.marginBottom ?? 25}
+              value={pageLayout?.marginBottom ?? 25}
             />
           </div>
           <div class={flex({ flexDirection: 'column', alignItems: 'center', gap: '4px' })}>
             <div class={css({ fontSize: '12px', color: 'text.subtle', width: '32px' })}>왼쪽</div>
             <TextInput
               style={css.raw({ width: '80px' })}
-              max={pageLayout.current ? String(getMaxMargin('left', pageLayout.current)) : undefined}
+              max={pageLayout ? String(getMaxMargin('left', pageLayout)) : undefined}
               min="0"
               onchange={(e) => {
-                if (!pageLayout.current) return;
+                if (!pageLayout) return;
                 const target = e.target as HTMLInputElement;
-                const value = clamp(Number(target.value), 0, getMaxMargin('left', pageLayout.current));
+                const value = clamp(Number(target.value), 0, getMaxMargin('left', pageLayout));
                 target.value = String(value);
-                pageLayout.current = {
-                  ...pageLayout.current,
+                pageLayout = {
+                  ...pageLayout,
                   marginLeft: value,
                 };
               }}
               size="sm"
               type="number"
-              value={pageLayout.current?.marginLeft ?? 25}
+              value={pageLayout?.marginLeft ?? 25}
             />
           </div>
           <div class={flex({ flexDirection: 'column', alignItems: 'center', gap: '4px' })}>
             <div class={css({ fontSize: '12px', color: 'text.subtle', width: '32px' })}>오른쪽</div>
             <TextInput
               style={css.raw({ width: '80px' })}
-              max={pageLayout.current ? String(getMaxMargin('right', pageLayout.current)) : undefined}
+              max={pageLayout ? String(getMaxMargin('right', pageLayout)) : undefined}
               min="0"
               oninput={(e) => {
-                if (!pageLayout.current) return;
+                if (!pageLayout) return;
                 const target = e.target as HTMLInputElement;
-                const value = clamp(Number(target.value), 0, getMaxMargin('right', pageLayout.current));
+                const value = clamp(Number(target.value), 0, getMaxMargin('right', pageLayout));
                 target.value = String(value);
-                pageLayout.current = {
-                  ...pageLayout.current,
+                pageLayout = {
+                  ...pageLayout,
                   marginRight: value,
                 };
               }}
               size="sm"
               type="number"
-              value={pageLayout.current?.marginRight ?? 25}
+              value={pageLayout?.marginRight ?? 25}
             />
           </div>
         </div>
       </div>
     {/if}
 
-    {#if !isPageLayoutEnabled || !pageLayout.current}
+    {#if !isPageLayoutEnabled || !pageLayout}
       <div class={flex({ flexDirection: 'column', gap: '8px', paddingX: '20px' })}>
         <div class={flex({ alignItems: 'center', gap: '8px' })}>
           <Icon style={css.raw({ color: 'text.faint' })} icon={RulerDimensionLineIcon} />
@@ -339,10 +336,10 @@
               { label: '800px', value: 800 },
             ]}
             onselect={(value) => {
-              maxWidth.current = value;
+              maxWidth = value;
             }}
             size="sm"
-            value={maxWidth.current ?? 800}
+            value={maxWidth ?? 800}
           />
         </div>
       </div>

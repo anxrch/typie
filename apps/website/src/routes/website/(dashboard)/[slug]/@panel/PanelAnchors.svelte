@@ -17,11 +17,9 @@
   import type { Editor } from '@tiptap/core';
   import type { AnchorPosition } from '@typie/ui/anchor';
   import type { Ref } from '@typie/ui/utils';
-  import type * as Y from 'yjs';
 
   type Props = {
     editor?: Ref<Editor>;
-    doc: Y.Doc;
   };
 
   type Anchor = AnchorPosition & {
@@ -31,7 +29,7 @@
     icon?: typeof ArrowUpToLineIcon;
   };
 
-  let { editor, doc }: Props = $props();
+  let { editor }: Props = $props();
 
   const view = getViewContext();
 
@@ -44,7 +42,7 @@
   let inputEl = $state<HTMLInputElement>();
 
   const loadAnchors = async () => {
-    if (!editor?.current || !doc) return;
+    if (!editor?.current) return;
 
     try {
       await tick();
@@ -173,7 +171,7 @@
   };
 
   const toggleBookmark = async (anchor: Anchor) => {
-    if (!editor?.current || !doc) return;
+    if (!editor?.current) return;
 
     if (anchor.isAnchor) {
       const { [anchor.nodeId]: removed, ...newAnchors } = docAnchors;

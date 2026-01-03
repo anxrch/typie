@@ -13,7 +13,6 @@
   import PanelTimeline from './PanelTimeline.svelte';
   import type { Editor } from '@tiptap/core';
   import type { Ref } from '@typie/ui/utils';
-  import type * as Y from 'yjs';
   import type { Editor_Panel_post, Editor_Panel_user } from '$graphql';
 
   type Props = {
@@ -21,14 +20,12 @@
     $user: Editor_Panel_user;
     editor?: Ref<Editor>;
     viewEditor?: Ref<Editor>;
-    doc: Y.Doc;
-    viewDoc?: Y.Doc;
   };
 
   const minWidth = 240;
   const maxWidth = 400;
 
-  let { $post: _post, $user: _user, editor, viewEditor, doc, viewDoc = $bindable() }: Props = $props();
+  let { $post: _post, $user: _user, editor, viewEditor }: Props = $props();
 
   const user = fragment(
     _user,
@@ -162,7 +159,7 @@
     {/if}
 
     {#if app.preference.current.panelTabByViewId[splitViewId] === 'anchors'}
-      <PanelAnchors {doc} {editor} />
+      <PanelAnchors {editor} />
     {/if}
 
     {#if app.preference.current.panelTabByViewId[splitViewId] === 'spellcheck'}
@@ -170,11 +167,11 @@
     {/if}
 
     {#if app.preference.current.panelTabByViewId[splitViewId] === 'timeline'}
-      <PanelTimeline {$post} {doc} {editor} {viewEditor} bind:viewDoc />
+      <PanelTimeline {$post} {editor} {viewEditor} />
     {/if}
 
     {#if app.preference.current.panelTabByViewId[splitViewId] === 'settings'}
-      <PanelBodySettings {doc} {editor} />
+      <PanelBodySettings {editor} />
     {/if}
   {/if}
 </aside>
