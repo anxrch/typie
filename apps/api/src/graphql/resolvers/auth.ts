@@ -7,7 +7,6 @@ import { setCookie } from 'hono/cookie';
 import ky from 'ky';
 import { nanoid } from 'nanoid';
 import { match } from 'ts-pattern';
-import { redis } from '@/cache';
 import {
   db,
   first,
@@ -22,10 +21,8 @@ import {
   UserSingleSignOns,
   Widgets,
 } from '@/db';
-import { sendEmail } from '@/email';
-import { PasswordResetEmail, SignUpEmail } from '@/email/templates';
 import { SingleSignOnProvider, UserState } from '@/enums';
-import { dev, env } from '@/env';
+import { dev } from '@/env';
 import { TypieError } from '@/errors';
 import * as aws from '@/external/aws';
 import { apple, google, kakao, naver } from '@/external/sso';
@@ -96,28 +93,28 @@ builder.mutationFields((t) => ({
         throw new TypieError({ code: 'user_email_exists' });
       }
 
-      const code = nanoid();
+      // const code = nanoid();
 
-      await redis.setex(
-        `auth:email:${code}`,
-        24 * 60 * 60,
-        JSON.stringify({
-          email,
-          password: await argon2.hash(input.password),
-          name: input.name,
-          state: input.state,
-          marketingAgreed: input.marketingAgreed,
-          referralCode: input.referralCode,
-        }),
-      );
+      // await redis.setex(
+      //   `auth:email:${code}`,
+      //   24 * 60 * 60,
+      //   JSON.stringify({
+      //     email,
+      //     password: await argon2.hash(input.password),
+      //     name: input.name,
+      //     state: input.state,
+      //     marketingAgreed: input.marketingAgreed,
+      //     referralCode: input.referralCode,
+      //   }),
+      // );
 
-      await sendEmail({
-        recipient: input.email,
-        subject: '[타이피] 이메일 주소를 인증해 주세요',
-        body: SignUpEmail({
-          verificationUrl: `${env.AUTH_URL}/email?code=${code}`,
-        }),
-      });
+      // await sendEmail({
+      //   recipient: input.email,
+      //   subject: '[타이피] 이메일 주소를 인증해 주세요',
+      //   body: SignUpEmail({
+      //     verificationUrl: `${env.AUTH_URL}/email?code=${code}`,
+      //   }),
+      // });
 
       return true;
     },
@@ -126,13 +123,21 @@ builder.mutationFields((t) => ({
   authorizeSignUpEmail: t.fieldWithInput({
     type: 'String',
     input: { code: t.input.string() },
-    resolve: async (_, { input }, ctx) => {
-      const data = await redis.get(`auth:email:${input.code}`);
-      if (!data) {
-        throw new TypieError({ code: 'invalid_code' });
-      }
+    resolve: async (_, _input, ctx) => {
+      // const data = await redis.get(`auth:email:${_input.code}`);
+      // if (!data) {
+      //   throw new TypieError({ code: 'invalid_code' });
+      // }
 
-      const { email, password, name, state, marketingAgreed, referralCode } = JSON.parse(data);
+      // const { email, password, name, state, marketingAgreed, referralCode } = JSON.parse(data);
+      const { email, password, name, state, marketingAgreed, referralCode } = {
+        email: '',
+        password: '',
+        name: '',
+        state: '',
+        marketingAgreed: false,
+        referralCode: '',
+      };
 
       const existingUser = await db
         .select({ id: Users.id })
@@ -166,7 +171,7 @@ builder.mutationFields((t) => ({
         return user;
       });
 
-      await redis.del(`auth:email:${input.code}`);
+      // await redis.del(`auth:email:${input.code}`);
 
       await createSession(ctx, user.id);
 
@@ -286,23 +291,23 @@ builder.mutationFields((t) => ({
         throw new TypieError({ code: 'user_email_not_found' });
       }
 
-      const code = nanoid();
+      // const code = nanoid();
 
-      await redis.setex(
-        `auth:reset-password:${code}`,
-        60 * 60,
-        JSON.stringify({
-          email,
-        }),
-      );
+      // await redis.setex(
+      //   `auth:reset-password:${code}`,
+      //   60 * 60,
+      //   JSON.stringify({
+      //     email,
+      //   }),
+      // );
 
-      await sendEmail({
-        recipient: input.email,
-        subject: '[타이피] 비밀번호를 재설정해 주세요',
-        body: PasswordResetEmail({
-          resetUrl: `${env.AUTH_URL}/reset-password?code=${code}`,
-        }),
-      });
+      // await sendEmail({
+      //   recipient: input.email,
+      //   subject: '[타이피] 비밀번호를 재설정해 주세요',
+      //   body: PasswordResetEmail({
+      //     resetUrl: '',
+      //   }),
+      // });
 
       return true;
     },
@@ -312,19 +317,20 @@ builder.mutationFields((t) => ({
     type: 'Boolean',
     input: { code: t.input.string(), password: t.input.string() },
     resolve: async (_, { input }) => {
-      const data = await redis.get(`auth:reset-password:${input.code}`);
-      if (!data) {
-        throw new TypieError({ code: 'invalid_code' });
-      }
+      // const data = await redis.get(`auth:reset-password:${input.code}`);
+      // if (!data) {
+      //   throw new TypieError({ code: 'invalid_code' });
+      // }
 
-      const { email } = JSON.parse(data);
+      // const { email } = JSON.parse(data);
+      const { email } = { email: '' };
 
       await db
         .update(Users)
         .set({ password: await argon2.hash(input.password) })
         .where(eq(Users.email, email));
 
-      await redis.del(`auth:reset-password:${input.code}`);
+      // await redis.del(`auth:reset-password:${input.code}`);
 
       return true;
     },

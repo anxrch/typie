@@ -6,7 +6,6 @@ import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, sql, sum } from 'd
 import { nanoid } from 'nanoid';
 import qs from 'query-string';
 import * as uuid from 'uuid';
-import { redis } from '@/cache';
 import {
   CreditCodes,
   db,
@@ -36,8 +35,6 @@ import {
   UserSurveys,
   validateDbId,
 } from '@/db';
-import { sendEmail } from '@/email';
-import { EmailUpdatedEmail, EmailUpdateEmail } from '@/email/templates';
 import {
   CreditCodeState,
   EntityState,
@@ -411,7 +408,7 @@ builder.mutationFields((t) => ({
   sendEmailUpdateEmail: t.withAuth({ session: true }).fieldWithInput({
     type: 'Boolean',
     input: { email: t.input.string() },
-    resolve: async (_, { input }, ctx) => {
+    resolve: async (_, { input }) => {
       const email = input.email.toLowerCase();
 
       const existingUser = await db
@@ -424,28 +421,28 @@ builder.mutationFields((t) => ({
         throw new TypieError({ code: 'user_email_exists' });
       }
 
-      const user = await db.select({ name: Users.name }).from(Users).where(eq(Users.id, ctx.session.userId)).then(firstOrThrow);
+      // const user = await db.select({ name: Users.name }).from(Users).where(eq(Users.id, '')).then(firstOrThrow);
 
-      const code = nanoid();
+      // const code = nanoid();
 
-      await redis.setex(
-        `user:update-email:${code}`,
-        24 * 60 * 60,
-        JSON.stringify({
-          email,
-          userId: ctx.session.userId,
-        }),
-      );
+      // await redis.setex(
+      //   `user:update-email:${code}`,
+      //   24 * 60 * 60,
+      //   JSON.stringify({
+      //     email,
+      //     userId: ctx.session.userId,
+      //   }),
+      // );
 
-      await sendEmail({
-        recipient: input.email,
-        subject: '[타이피] 이메일 주소를 인증해 주세요',
-        body: EmailUpdateEmail({
-          name: user.name,
-          email,
-          verificationUrl: `${env.AUTH_URL}/update-email?code=${code}`,
-        }),
-      });
+      // await sendEmail({
+      //   recipient: input.email,
+      //   subject: '[타이피] 이메일 주소를 인증해 주세요',
+      //   body: EmailUpdateEmail({
+      //     name: '',
+      //     email,
+      //     verificationUrl: '',
+      //   }),
+      // });
 
       return true;
     },
@@ -454,13 +451,15 @@ builder.mutationFields((t) => ({
   updateEmail: t.fieldWithInput({
     type: 'Boolean',
     input: { code: t.input.string() },
-    resolve: async (_, { input }) => {
-      const data = await redis.get(`user:update-email:${input.code}`);
-      if (!data) {
-        throw new TypieError({ code: 'invalid_code' });
-      }
+    resolve: async (_, input) => {
+      // const data = await redis.get(`user:update-email:${input.code}`);
+      // if (!data) {
+      //   throw new TypieError({ code: 'invalid_code' });
+      // }
 
-      const { email, userId } = JSON.parse(data);
+      // const { email, userId } = JSON.parse(data);
+      const { email } = { email: '' };
+      const userId = '';
 
       const user = await db
         .select({ id: Users.id, name: Users.name, email: Users.email })
@@ -468,18 +467,18 @@ builder.mutationFields((t) => ({
         .where(and(eq(Users.id, userId), eq(Users.state, UserState.ACTIVE)))
         .then(firstOrThrow);
 
-      await db.update(Users).set({ email }).where(eq(Users.id, user.id));
+      // await db.update(Users).set({ email }).where(eq(Users.id, user.id));
 
-      await redis.del(`user:update-email:${input.code}`);
+      // await redis.del(`user:update-email:${input.code}`);
 
-      await sendEmail({
-        recipient: user.email,
-        subject: '[타이피] 이메일 주소가 변경되었어요',
-        body: EmailUpdatedEmail({
-          name: user.name,
-          email,
-        }),
-      });
+      // await sendEmail({
+      //   recipient: user.email,
+      //   subject: '[타이피] 이메일 주소가 변경되었어요',
+      //   body: EmailUpdatedEmail({
+      //     name: user.name,
+      //     email,
+      //   }),
+      // });
 
       return true;
     },
@@ -704,10 +703,10 @@ builder.mutationFields((t) => ({
 
   createWsSession: t.withAuth({ session: true }).field({
     type: 'String',
-    resolve: async (_, __, ctx) => {
+    resolve: async (_parent, ctx) => {
       const token = nanoid(64);
 
-      await redis.setex(`user:ws:${token}`, 60 * 10, JSON.stringify({ userId: ctx.session.userId }));
+      // await redis.setex(`user:ws:${token}`, 60 * 10, JSON.stringify({ userId: ctx.session.userId }));
 
       return token;
     },
