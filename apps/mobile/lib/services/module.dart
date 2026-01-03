@@ -10,12 +10,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:mixpanel_flutter/mixpanel_flutter.dart';
 import 'package:typie/env.dart';
+import 'package:typie/services/analytics.dart';
 import 'package:typie/styles/colors.dart';
 
 @module
 abstract class RegisterModule {
   @singleton
-  FirebaseAnalytics get firebaseAnalytics => FirebaseAnalytics.instance;
+  Analytics get analytics =>
+      Env.analyticsEnabled ? FirebaseAnalyticsService(FirebaseAnalytics.instance) : const NoopAnalytics();
 
   @singleton
   FlutterSecureStorage get flutterSecureStorage => const FlutterSecureStorage(

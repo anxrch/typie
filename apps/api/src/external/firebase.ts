@@ -4,14 +4,22 @@ import { FirebaseMessagingError, getMessaging } from 'firebase-admin/messaging';
 import { db, UserPushNotificationTokens } from '@/db';
 import { env } from '@/env';
 
-export const app = initializeApp({
-  credential: cert(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT)),
-});
+const firebaseEnabled = env.PUSH_NOTIFICATIONS_ENABLED && !!env.GOOGLE_SERVICE_ACCOUNT;
 
-export const messaging = getMessaging(app);
+export const app = firebaseEnabled
+  ? initializeApp({
+      credential: cert(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT!)),
+    })
+  : null;
+
+export const messaging = app ? getMessaging(app) : null;
 
 type SendPushNotificationParams = { userId: string; title: string; body: string };
 export const sendPushNotification = async ({ userId, title, body }: SendPushNotificationParams) => {
+  if (!messaging) {
+    return false;
+  }
+
   const tokens = await db
     .select({ token: UserPushNotificationTokens.token })
     .from(UserPushNotificationTokens)

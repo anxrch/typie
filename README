@@ -1,3 +1,8 @@
 타이피 - 작가를 위한 올인원 글쓰기 도구
 
 작성, 정리, 공유까지. 글쓰기의 모든 과정을 하나의 도구로 해결하세요.
+
+## Feature flags
+
+- `PUSH_NOTIFICATIONS_ENABLED` (API, mobile): defaults to `true`. Set to `false` to disable Firebase Admin initialization, push token registration/deletion, and the toast listener so the stack can run without Firebase credentials.
+- `ANALYTICS_ENABLED` (mobile): defaults to `true`. Set to `false` to provide a no-op analytics implementation and, when combined with `PUSH_NOTIFICATIONS_ENABLED=false`, skip Firebase bootstrapping so the app can run without `google-services.json` / `GoogleService-Info.plist`.

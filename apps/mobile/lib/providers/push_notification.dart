@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:typie/context/toast.dart';
+import 'package:typie/env.dart';
 import 'package:typie/graphql/client.dart';
 import 'package:typie/hooks/service.dart';
 import 'package:typie/providers/__generated__/register_push_notification_token_mutation.req.gql.dart';
@@ -19,18 +20,28 @@ class PushNotificationProvider extends HookWidget {
     final auth = useService<Auth>();
     final client = useService<GraphQLClient>();
     final authState = useValueListenable(auth);
+    final pushEnabled = Env.pushNotificationsEnabled;
+    final offline = authState is Offline;
 
     useEffect(() {
+      if (!pushEnabled || offline) {
+        return null;
+      }
+
       if (authState is Authenticated) {
         unawaited(_registerToken(client));
-      } else {
+      } else if (authState is Unauthenticated) {
         unawaited(_deleteToken());
       }
 
       return null;
-    }, [authState]);
+    }, [authState, client, offline, pushEnabled]);
 
     useEffect(() {
+      if (!pushEnabled || offline) {
+        return null;
+      }
+
       final subscription = FirebaseMessaging.onMessage.listen((message) {
         final title = message.notification?.title;
         if (context.mounted && title != null) {
@@ -39,13 +50,17 @@ class PushNotificationProvider extends HookWidget {
       });
 
       return subscription.cancel;
-    }, []);
+    }, [context, offline, pushEnabled]);
 
     return const SizedBox.shrink();
   }
 }
 
 Future<void> _registerToken(GraphQLClient client) async {
+  if (!Env.pushNotificationsEnabled) {
+    return;
+  }
+
   try {
     final status = await Permission.notification.request();
     if (!status.isGranted) {
@@ -73,6 +88,10 @@ Future<void> _registerToken(GraphQLClient client) async {
 }
 
 Future<void> _deleteToken() async {
+  if (!Env.pushNotificationsEnabled) {
+    return;
+  }
+
   try {
     await FirebaseMessaging.instance.deleteToken();
   } catch (_) {

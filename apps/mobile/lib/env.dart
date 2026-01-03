@@ -13,6 +13,9 @@ abstract class Env {
   @EnviedField()
   static String appsflyerKey = _Env.appsflyerKey;
 
+  @EnviedField(varName: 'ANALYTICS_ENABLED', defaultValue: true)
+  static bool analyticsEnabled = _Env.analyticsEnabled;
+
   @EnviedField()
   static String googleClientId = _Env.googleClientId;
 
@@ -39,6 +42,9 @@ abstract class Env {
 
   @EnviedField()
   static String sentryDsn = _Env.sentryDsn;
+
+  @EnviedField(varName: 'PUSH_NOTIFICATIONS_ENABLED', defaultValue: true)
+  static bool pushNotificationsEnabled = _Env.pushNotificationsEnabled;
 
   @EnviedField()
   static String usersiteUrl = _Env.usersiteUrl;
