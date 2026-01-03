@@ -122,7 +122,6 @@
     </div>
 
     <button
-      type="button"
       class={css({
         padding: '10px 12px',
         borderRadius: '8px',
@@ -133,8 +132,9 @@
         _hover: { backgroundColor: 'accent.brand.strong' },
         _active: { translate: '0 1px' },
       })}
-      onclick={createNote}
       disabled={isLoading}
+      onclick={createNote}
+      type="button"
     >
       새 노트 만들기
     </button>
@@ -145,7 +145,6 @@
       {:else}
         {#each notes as note (note.id)}
           <button
-            type="button"
             class={css({
               padding: '10px 12px',
               borderRadius: '8px',
@@ -158,6 +157,7 @@
               _hover: { backgroundColor: 'gray.50' },
             })}
             onclick={() => switchNote(note.id)}
+            type="button"
           >
             <div class={css({ fontWeight: 'semibold', color: 'text.default' })}>{note.title}</div>
             <div class={css({ fontSize: '12px', color: 'gray.600', marginTop: '4px' })}>
@@ -185,15 +185,14 @@
             backgroundColor: 'white',
             _focusWithin: { borderColor: 'accent.brand.default', boxShadow: '[0 0 0 2px {colors.accent.brand.muted}]' },
           })}
+          disabled={isLoading}
+          onblur={saveCurrent}
+          oninput={(event) => (editorTitle = (event.target as HTMLInputElement).value)}
           placeholder="제목을 입력하세요"
           value={editorTitle}
-          oninput={(event) => (editorTitle = (event.target as HTMLInputElement).value)}
-          onblur={saveCurrent}
-          disabled={isLoading}
         />
 
         <button
-          type="button"
           class={css({
             padding: '10px 12px',
             borderRadius: '8px',
@@ -203,12 +202,13 @@
             color: 'gray.700',
             _hover: { backgroundColor: 'gray.50' },
           })}
+          disabled={isLoading}
           onclick={async () => {
             if (selectedId) {
               await deleteNote(selectedId);
             }
           }}
-          disabled={isLoading}
+          type="button"
         >
           노트 삭제
         </button>
@@ -230,11 +230,11 @@
           resize: 'vertical',
           _focusWithin: { borderColor: 'accent.brand.default', boxShadow: '[0 0 0 2px {colors.accent.brand.muted}]' },
         })}
+        disabled={isLoading}
+        onblur={saveCurrent}
+        oninput={(event) => (editorContent = (event.target as HTMLTextAreaElement).value)}
         placeholder="아이디어, 메모, 글감을 자유롭게 적어보세요. 내용은 모두 로컬에만 저장돼요."
         value={editorContent}
-        oninput={(event) => (editorContent = (event.target as HTMLTextAreaElement).value)}
-        onblur={saveCurrent}
-        disabled={isLoading}
       ></textarea>
 
       <div class={flex({ justifyContent: 'space-between', alignItems: 'center' })}>
@@ -244,7 +244,6 @@
 
         <div class={flex({ gap: '8px' })}>
           <button
-            type="button"
             class={css({
               padding: '10px 12px',
               borderRadius: '8px',
@@ -254,14 +253,14 @@
               color: 'gray.700',
               _hover: { backgroundColor: 'gray.50' },
             })}
-            onclick={createNote}
             disabled={isLoading}
+            onclick={createNote}
+            type="button"
           >
             새 노트
           </button>
 
           <button
-            type="button"
             class={css({
               padding: '10px 16px',
               borderRadius: '8px',
@@ -271,8 +270,9 @@
               _hover: { backgroundColor: 'accent.brand.strong' },
               _active: { translate: '0 1px' },
             })}
-            onclick={saveCurrent}
             disabled={isLoading}
+            onclick={saveCurrent}
+            type="button"
           >
             변경 내용 저장
           </button>
@@ -285,7 +285,6 @@
           새 노트를 만들어 오프라인으로 바로 작성해보세요.
         </p>
         <button
-          type="button"
           class={css({
             padding: '10px 16px',
             borderRadius: '8px',
@@ -295,8 +294,9 @@
             _hover: { backgroundColor: 'accent.brand.strong' },
             _active: { translate: '0 1px' },
           })}
-          onclick={createNote}
           disabled={isLoading}
+          onclick={createNote}
+          type="button"
         >
           첫 노트 만들기
         </button>

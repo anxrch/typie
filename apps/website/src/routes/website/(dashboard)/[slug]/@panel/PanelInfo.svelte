@@ -3,9 +3,7 @@
   import { center, flex } from '@typie/styled-system/patterns';
   import { tooltip } from '@typie/ui/actions';
   import { Icon } from '@typie/ui/components';
-  import { getAppContext } from '@typie/ui/context';
   import dayjs from 'dayjs';
-  import mixpanel from 'mixpanel-browser';
   import { EntityAvailability, EntityVisibility } from '@/enums';
   import ExternalLinkIcon from '~icons/lucide/external-link';
   import { fragment, graphql } from '$graphql';
@@ -56,8 +54,6 @@
       }
     `),
   );
-
-  const app = getAppContext();
 </script>
 
 <div

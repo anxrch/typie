@@ -25,8 +25,8 @@
   import { fragment, graphql } from '$graphql';
   import { getViewContext } from '../@split-view/context.svelte';
   import type { Editor } from '@tiptap/core';
-  import type { PageLayout, Ref } from '@typie/ui/utils';
   import type { Node } from '@tiptap/pm/model';
+  import type { PageLayout, Ref } from '@typie/ui/utils';
   import type { Action } from 'svelte/action';
   import type { PointerEventHandler } from 'svelte/elements';
   import type { Editor_Panel_PanelTimeline_post } from '$graphql';
