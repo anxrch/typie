@@ -319,7 +319,6 @@ PostView.implement({
           }
         }
 
-
         const loader = ctx.loader({
           name: 'PostView.body',
           load: async (ids) => {
@@ -777,7 +776,6 @@ builder.mutationFields((t) => ({
           .where(and(eq(Notes.entityId, entity.id), eq(Notes.state, NoteState.ACTIVE)));
       });
 
-
       return input.postId;
     },
   }),
@@ -1146,4 +1144,3 @@ builder.mutationFields((t) => ({
     },
   }),
 }));
-

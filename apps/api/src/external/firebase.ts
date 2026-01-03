@@ -6,11 +6,12 @@ import { env } from '@/env';
 
 const firebaseEnabled = env.PUSH_NOTIFICATIONS_ENABLED && !!env.GOOGLE_SERVICE_ACCOUNT;
 
-export const app = firebaseEnabled && env.GOOGLE_SERVICE_ACCOUNT
-  ? initializeApp({
-      credential: cert(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT)),
-    })
-  : null;
+export const app =
+  firebaseEnabled && env.GOOGLE_SERVICE_ACCOUNT
+    ? initializeApp({
+        credential: cert(JSON.parse(env.GOOGLE_SERVICE_ACCOUNT)),
+      })
+    : null;
 
 export const messaging = app ? getMessaging(app) : null;
 
