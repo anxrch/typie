@@ -23,7 +23,9 @@ Future<void> configureStaticServices() async {
     ),
   );
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (Env.analyticsEnabled || Env.pushNotificationsEnabled) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
 
   await GoogleSignIn.instance.initialize(clientId: Env.googleClientId, serverClientId: Env.googleServerClientId);
 

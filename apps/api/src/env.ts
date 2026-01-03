@@ -16,7 +16,7 @@ const schema = z.object({
   GOOGLE_OAUTH_CLIENT_ID: z.string(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string(),
   GOOGLE_PLAY_PACKAGE_NAME: z.string(),
-  GOOGLE_SERVICE_ACCOUNT: z.string(),
+  GOOGLE_SERVICE_ACCOUNT: z.string().optional(),
   IFRAMELY_API_KEY: z.string(),
   KAKAO_CLIENT_ID: z.string(),
   KAKAO_CLIENT_SECRET: z.string(),
@@ -36,6 +36,7 @@ const schema = z.object({
   SLACK_BOT_TOKEN: z.string(),
   SLACK_SIGNING_SECRET: z.string(),
   SLACK_WEBHOOK_URL: z.string(),
+  PUSH_NOTIFICATIONS_ENABLED: z.coerce.boolean().optional().default(true),
   SPELLCHECK_API_KEY: z.string().optional(),
   SPELLCHECK_OFFLINE: z.coerce.boolean().optional().default(false),
   SPELLCHECK_URL: z.string().optional(),
@@ -57,6 +58,14 @@ const schema = z.object({
         message: 'SPELLCHECK_URL is required unless SPELLCHECK_OFFLINE is enabled',
       });
     }
+  }
+
+  if (value.PUSH_NOTIFICATIONS_ENABLED && !value.GOOGLE_SERVICE_ACCOUNT) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['GOOGLE_SERVICE_ACCOUNT'],
+      message: 'GOOGLE_SERVICE_ACCOUNT is required when push notifications are enabled',
+    });
   }
 });
 

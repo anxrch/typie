@@ -1,15 +1,25 @@
 import { androidpublisher, auth } from '@googleapis/androidpublisher';
 import { env } from '@/env';
 
-const client = androidpublisher({
-  version: 'v3',
-  auth: new auth.GoogleAuth({
-    credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT),
-    scopes: ['https://www.googleapis.com/auth/androidpublisher'],
-  }),
-});
+const googleAuth = env.GOOGLE_SERVICE_ACCOUNT
+  ? new auth.GoogleAuth({
+      credentials: JSON.parse(env.GOOGLE_SERVICE_ACCOUNT),
+      scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+    })
+  : null;
+
+const client = googleAuth
+  ? androidpublisher({
+      version: 'v3',
+      auth: googleAuth,
+    })
+  : null;
 
 export const getSubscription = async (purchaseToken: string) => {
+  if (!client) {
+    throw new Error('Google Play client is not configured (missing GOOGLE_SERVICE_ACCOUNT).');
+  }
+
   // spell-checker:disable-next-line
   const response = await client.purchases.subscriptionsv2.get({
     packageName: env.GOOGLE_PLAY_PACKAGE_NAME,
