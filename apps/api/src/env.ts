@@ -36,10 +36,28 @@ const schema = z.object({
   SLACK_BOT_TOKEN: z.string(),
   SLACK_SIGNING_SECRET: z.string(),
   SLACK_WEBHOOK_URL: z.string(),
-  SPELLCHECK_API_KEY: z.string(),
-  SPELLCHECK_URL: z.string(),
+  SPELLCHECK_API_KEY: z.string().optional(),
+  SPELLCHECK_OFFLINE: z.coerce.boolean().optional().default(false),
+  SPELLCHECK_URL: z.string().optional(),
   USERSITE_URL: z.string(),
   WEBSITE_URL: z.string(),
+}).superRefine((value, ctx) => {
+  if (!value.SPELLCHECK_OFFLINE) {
+    if (!value.SPELLCHECK_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SPELLCHECK_API_KEY'],
+        message: 'SPELLCHECK_API_KEY is required unless SPELLCHECK_OFFLINE is enabled',
+      });
+    }
+    if (!value.SPELLCHECK_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SPELLCHECK_URL'],
+        message: 'SPELLCHECK_URL is required unless SPELLCHECK_OFFLINE is enabled',
+      });
+    }
+  }
 });
 
 export const env = schema.parse(process.env.ENV_JSON ? JSON.parse(process.env.ENV_JSON) : process.env);

@@ -60,6 +60,233 @@ const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '' 
 
 const MAX_CHUNK_SIZE = 500;
 const MAX_CONCURRENCY = 100;
+const CACHE_TTL_SECONDS = 60 * 60 * 24;
+
+type CacheClient = {
+  get: (key: string) => Promise<string | null>;
+  setex: (key: string, ttl: number, value: string) => Promise<unknown>;
+};
+
+export type SpellcheckOptions = {
+  offline?: boolean;
+  cache?: CacheClient;
+  fetcher?: (sentence: string) => Promise<string>;
+  url?: string;
+  apiKey?: string;
+};
+
+type NormalizedError = {
+  index: number;
+  start: number;
+  end: number;
+  corrections: string[];
+  explanation: string;
+  type: (typeof errorTypes)[number];
+};
+
+const offlineCorrections: Record<string, string[]> = {
+  accomodate: ['accommodate'],
+  adress: ['address'],
+  adressing: ['addressing'],
+  agressive: ['aggressive'],
+  apparant: ['apparent'],
+  arguement: ['argument'],
+  beleive: ['believe'],
+  calender: ['calendar'],
+  definately: ['definitely'],
+  enviroment: ['environment'],
+  finaly: ['finally'],
+  goverment: ['government'],
+  greatful: ['grateful'],
+  happend: ['happened'],
+  harrasment: ['harassment'],
+  occurence: ['occurrence'],
+  ocurred: ['occurred'],
+  recieve: ['receive'],
+  recieving: ['receiving'],
+  recomend: ['recommend'],
+  responsability: ['responsibility'],
+  seperate: ['separate'],
+  sucessful: ['successful'],
+  tommorow: ['tomorrow'],
+  untill: ['until'],
+  wierd: ['weird'],
+  writting: ['writing'],
+};
+
+const spacingPattern = /\s{2,}/g;
+const wordPattern = /\b([A-Za-z][A-Za-z']+)\b/g;
+
+const memoryCache = new Map<string, string>();
+const memoryOnlyCache: CacheClient = {
+  get: async (key) => memoryCache.get(key) ?? null,
+  setex: async (key, _ttl, value) => {
+    memoryCache.set(key, value);
+  },
+};
+
+const buildOfflineErrors = (normalizedText: string): NormalizedError[] => {
+  const errors: NormalizedError[] = [];
+
+  const wordMatcher = new RegExp(wordPattern.source, wordPattern.flags);
+  let match;
+  while ((match = wordMatcher.exec(normalizedText))) {
+    const word = match[1];
+    const start = match.index ?? 0;
+    const correction = offlineCorrections[word.toLowerCase()];
+    if (!correction) continue;
+
+    errors.push({
+      index: errors.length,
+      start,
+      end: start + word.length,
+      corrections: correction,
+      explanation: 'Offline dictionary suggestion',
+      type: 'misused-word',
+    });
+  }
+
+  const spacingMatcher = new RegExp(spacingPattern.source, spacingPattern.flags);
+  while ((match = spacingMatcher.exec(normalizedText))) {
+    const start = match.index ?? 0;
+    errors.push({
+      index: errors.length,
+      start,
+      end: start + match[0].length,
+      corrections: [' '],
+      explanation: 'Offline checker found repeated spacing',
+      type: 'statistical-spacing',
+    });
+  }
+
+  return errors;
+};
+
+const inflateError = (
+  error: NormalizedError,
+  chunk: { text: string; start: number; end: number },
+  normalized: ReturnType<typeof normalize>,
+): SpellingError => {
+  const start = normalized.map(error.start);
+  const end = normalized.map(error.end, true);
+
+  return {
+    index: error.index,
+    start: chunk.start + start,
+    end: chunk.start + end,
+    context: chunk.text.slice(start, end),
+    corrections: error.corrections,
+    explanation: error.explanation,
+    type: error.type,
+  };
+};
+
+const parseXmlErrors = (
+  xml: string,
+  chunk: { text: string; start: number; end: number },
+  normalized: ReturnType<typeof normalize>,
+): SpellingError[] => {
+  try {
+    const resp = parser.parse(xml) as CheckSpellResponse;
+    const errorList = resp.PnuNlpSpeller?.PnuErrorWordList;
+
+    if (errorList?.Error) {
+      const msg = typeof errorList.Error === 'string' ? errorList.Error : errorList.Error.msg;
+      if (msg !== '문법 및 철자 오류가 발견되지 않았습니다.') {
+        Sentry.captureException(new Error(`Spellcheck API error: ${msg}`));
+      }
+
+      return [];
+    }
+
+    if (!errorList?.PnuErrorWord) return [];
+
+    const errors = [errorList.PnuErrorWord].flat() as PnuErrorWord[];
+    const chunkText = chunk.text;
+
+    return errors.map((error) => {
+      const start = normalized.map(Number(error.m_nStart));
+      const end = normalized.map(Number(error.m_nEnd), true);
+      const type = errorTypes[Number(error.Help?.nCorrectMethod)] ?? 'no-error';
+
+      return {
+        index: Number(error.nErrorIdx),
+        start: chunk.start + start,
+        end: chunk.start + end,
+        context: chunkText.slice(start, end),
+        corrections:
+          error.CandWordList && Number(error.CandWordList.m_nCount) > 0
+            ? [error.CandWordList.CandWord].flat().filter((x) => x !== undefined)
+            : [],
+        explanation: DOMPurify.sanitize(error.Help?.['#text'] ?? '', { ALLOWED_TAGS: ['br'] }),
+        type,
+      };
+    });
+  } catch (err) {
+    Sentry.captureException(err);
+    return [];
+  }
+};
+
+const createRemoteFetcher =
+  (url?: string, apiKey?: string) =>
+  async (sentence: string): Promise<string> => {
+    if (!url || !apiKey) {
+      throw new Error('Spellcheck remote configuration is missing');
+    }
+
+    return ky
+      .post(url, {
+        headers: { 'x-api-key': apiKey },
+        json: { sentence },
+      })
+      .text();
+  };
+
+const shouldUseOffline = (options: SpellcheckOptions, url?: string, apiKey?: string) => {
+  if (options.offline !== undefined) {
+    return options.offline || !url || !apiKey;
+  }
+
+  return env.SPELLCHECK_OFFLINE || !url || !apiKey;
+};
+
+const getCachedValue = async (key: string, cache: CacheClient) => {
+  try {
+    const cached = await cache.get(key);
+    if (cached) return cached;
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+
+  return memoryCache.get(key) ?? null;
+};
+
+const setCachedValue = async (key: string, value: string, cache: CacheClient) => {
+  memoryCache.set(key, value);
+
+  try {
+    await cache.setex(key, CACHE_TTL_SECONDS, value);
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+};
+
+const getCachedErrors = async (key: string, cache: CacheClient) => {
+  const cached = await getCachedValue(key, cache);
+  if (!cached) return null;
+
+  try {
+    return JSON.parse(cached) as NormalizedError[];
+  } catch (error) {
+    Sentry.captureException(error);
+    return null;
+  }
+};
+
+const setCachedErrors = async (key: string, errors: NormalizedError[], cache: CacheClient) => {
+  await setCachedValue(key, JSON.stringify(errors), cache);
+};
 
 const ALLOWED_CHARS = /^[\u{AC00}-\u{D7AF}\u{3131}-\u{318E}A-Za-z0-9\s.,!?:;()[\]"'/\\@#$%&*+=_~`{}<>|^。、「」『』“”‘’！？…·ㆍ-]$/u;
 const SENTENCE_PATTERN = /([.!?。！？]+\s*)/g;
@@ -121,10 +348,16 @@ const normalize = (text: string) => {
   return { text: normalized, map };
 };
 
-export const check = async (text: string) => {
+export const check = async (text: string, options: SpellcheckOptions = {}) => {
   const normalized = normalize(text);
 
   if (!normalized.text.trim()) return [];
+
+  const cache = options.cache ?? redis ?? memoryOnlyCache;
+  const url = options.url ?? env.SPELLCHECK_URL;
+  const apiKey = options.apiKey ?? env.SPELLCHECK_API_KEY;
+  const offlineMode = shouldUseOffline(options, url, apiKey);
+  const fetcher = options.fetcher ?? createRemoteFetcher(url, apiKey);
 
   const chunks: { text: string; start: number; end: number }[] = [];
   let chunk = '';
@@ -249,62 +482,35 @@ export const check = async (text: string) => {
   const results = await pMap(
     chunks,
     async (chunk) => {
-      try {
-        const chunkText = chunk.text;
-        const normalized = normalize(chunkText);
+      const normalizedChunk = normalize(chunk.text);
+      const hash = rapidhash(normalizedChunk.text);
 
-        const hash = rapidhash(normalized.text);
-        const key = `spellcheck:${hash}`;
+      if (offlineMode) {
+        const cacheKey = `spellcheck:offline:${hash}`;
+        const cachedErrors = await getCachedErrors(cacheKey, cache);
+        const normalizedErrors = cachedErrors ?? buildOfflineErrors(normalizedChunk.text);
 
-        let xml = await redis.get(key);
-        if (!xml) {
-          xml = await ky
-            .post(env.SPELLCHECK_URL, {
-              headers: { 'x-api-key': env.SPELLCHECK_API_KEY },
-              json: { sentence: normalized.text },
-            })
-            .text();
-
-          await redis.setex(key, 60 * 60 * 24, xml);
+        if (!cachedErrors) {
+          await setCachedErrors(cacheKey, normalizedErrors, cache);
         }
 
-        const resp = parser.parse(xml) as CheckSpellResponse;
-        const errorList = resp.PnuNlpSpeller?.PnuErrorWordList;
+        return normalizedErrors.map((error) => inflateError(error, chunk, normalizedChunk));
+      }
 
-        if (errorList?.Error) {
-          const msg = typeof errorList.Error === 'string' ? errorList.Error : errorList.Error.msg;
-          if (msg !== '문법 및 철자 오류가 발견되지 않았습니다.') {
-            Sentry.captureException(new Error(`Spellcheck API error: ${msg}`));
-          }
+      const cacheKey = `spellcheck:remote:${hash}`;
+      let xml = await getCachedValue(cacheKey, cache);
 
+      if (!xml) {
+        try {
+          xml = await fetcher(normalizedChunk.text);
+          await setCachedValue(cacheKey, xml, cache);
+        } catch (err) {
+          Sentry.captureException(err);
           return [];
         }
-
-        if (!errorList?.PnuErrorWord) return [];
-
-        const errors = [errorList.PnuErrorWord].flat() as PnuErrorWord[];
-
-        return errors.map((error) => {
-          const start = normalized.map(Number(error.m_nStart));
-          const end = normalized.map(Number(error.m_nEnd), true);
-
-          return {
-            index: Number(error.nErrorIdx),
-            start: chunk.start + start,
-            end: chunk.start + end,
-            context: chunkText.slice(start, end),
-            corrections:
-              error.CandWordList && Number(error.CandWordList.m_nCount) > 0
-                ? [error.CandWordList.CandWord].flat().filter((x) => x !== undefined)
-                : [],
-            explanation: DOMPurify.sanitize(error.Help?.['#text'] ?? '', { ALLOWED_TAGS: ['br'] }),
-            type: errorTypes[Number(error.Help?.nCorrectMethod)],
-          };
-        });
-      } catch (err) {
-        Sentry.captureException(err);
-        return [];
       }
+
+      return parseXmlErrors(xml, chunk, normalizedChunk);
     },
     { concurrency: MAX_CONCURRENCY },
   );
