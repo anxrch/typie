@@ -3,7 +3,6 @@ import { redis } from '@/cache';
 import { db, Entities, first, firstOrThrow, pg, Posts, TableCode, UserPaymentCredits, Users, UserSessions, validateDbId } from '@/db';
 import { EntityState, UserRole, UserState } from '@/enums';
 import { TypieError } from '@/errors';
-import { enqueueJob } from '@/mq';
 import { assertAdminPermission } from '@/utils/permission';
 import { builder } from '../builder';
 import { Post, User } from '../objects';
@@ -208,18 +207,6 @@ builder.mutationFields((t) => ({
       await assertAdminPermission({ sessionId: ctx.session.id });
 
       await redis.del(`admin:impersonate:${ctx.session.id}`);
-
-      return true;
-    },
-  }),
-
-  adminEnqueuePostCompact: t.withAuth({ session: true }).fieldWithInput({
-    type: 'Boolean',
-    input: { postId: t.input.string({ validate: validateDbId(TableCode.POSTS) }) },
-    resolve: async (_, { input }, ctx) => {
-      await assertAdminPermission({ sessionId: ctx.session.id });
-
-      await enqueueJob('post:compact', input.postId);
 
       return true;
     },
