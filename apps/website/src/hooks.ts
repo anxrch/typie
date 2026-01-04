@@ -2,7 +2,12 @@ import { env } from '$env/dynamic/public';
 import type { Reroute } from '@sveltejs/kit';
 
 export const reroute: Reroute = async ({ url }) => {
-  if (url.pathname === '/graphql' || url.pathname === '/robots.txt') {
+  if (
+    url.pathname === '/' ||
+    url.pathname.startsWith('/offline-editor') ||
+    url.pathname === '/graphql' ||
+    url.pathname === '/robots.txt'
+  ) {
     return url.pathname;
   } else if (url.origin === env.PUBLIC_AUTH_URL) {
     return `/auth${url.pathname}`;
@@ -14,5 +19,5 @@ export const reroute: Reroute = async ({ url }) => {
     return `/usersite/wildcard${url.pathname}`;
   }
 
-  throw new Error('Invalid URL');
+  return url.pathname;
 };
