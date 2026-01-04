@@ -61,7 +61,7 @@ const createSubscriber = <T>(): Subscriber<T> => {
     },
   };
 
-  return Object.assign(iterator, { push, close });
+  return Object.assign(iterator, { push, close }) as Subscriber<T>;
 };
 
 const channels = new Map<string, Set<Subscriber<unknown>>>();
