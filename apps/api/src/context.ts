@@ -7,7 +7,6 @@ import { HTTPException } from 'hono/http-exception';
 import * as jose from 'jose';
 import { nanoid } from 'nanoid';
 import * as R from 'remeda';
-import { redis } from '@/cache';
 import { db, firstOrThrow, UserSessions } from '@/db';
 import { publicKey } from '@/utils';
 import type { Context as HonoContext } from 'hono';

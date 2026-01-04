@@ -7,7 +7,6 @@ import { db, Entities, first, firstOrThrow, FontFamilies, Fonts, PostContents, P
 import { EntityState, EntityType, FontState } from '@/enums';
 import { env } from '@/env';
 import { TypieError } from '@/errors';
-import { pubsub } from '@/pubsub';
 import { generateRandomName } from '@/utils/name';
 import { assertSitePermission } from '@/utils/permission';
 import { siteSchema } from '@/validation';

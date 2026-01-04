@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { redis } from '@/cache';
 import { db } from '@/db';
 import type { Env } from '@/context';
 

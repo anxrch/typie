@@ -1,6 +1,5 @@
 import dedent from 'dedent';
 import { nanoid } from 'nanoid';
-import { redis } from '@/cache';
 
 export class Lock {
   #id: string;

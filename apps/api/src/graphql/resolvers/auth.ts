@@ -7,7 +7,6 @@ import { setCookie } from 'hono/cookie';
 import ky from 'ky';
 import { nanoid } from 'nanoid';
 import { match } from 'ts-pattern';
-import { redis } from '@/cache';
 import {
   db,
   first,

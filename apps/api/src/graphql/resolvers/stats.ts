@@ -2,7 +2,6 @@ import { GetCostAndUsageCommand } from '@aws-sdk/client-cost-explorer';
 import dayjs from 'dayjs';
 import { sql } from 'drizzle-orm';
 import ky from 'ky';
-import { redis } from '@/cache';
 import {
   db,
   Entities,

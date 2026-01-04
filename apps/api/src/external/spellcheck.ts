@@ -6,7 +6,6 @@ import DOMPurify from 'isomorphic-dompurify';
 import ky from 'ky';
 import pMap from 'p-map';
 import { rapidhash } from 'rapidhash-js';
-import { redis } from '@/cache';
 import { env } from '@/env';
 
 const errorTypes = [

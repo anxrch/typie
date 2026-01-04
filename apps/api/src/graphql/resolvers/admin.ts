@@ -1,9 +1,7 @@
 import { and, count, desc, eq, getTableColumns, ilike, or, sql } from 'drizzle-orm';
-import { redis } from '@/cache';
 import { db, Entities, first, firstOrThrow, pg, Posts, TableCode, UserPaymentCredits, Users, UserSessions, validateDbId } from '@/db';
 import { EntityState, UserRole, UserState } from '@/enums';
 import { TypieError } from '@/errors';
-import { enqueueJob } from '@/mq';
 import { assertAdminPermission } from '@/utils/permission';
 import { builder } from '../builder';
 import { Post, User } from '../objects';

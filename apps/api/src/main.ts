@@ -1,5 +1,4 @@
 import '@typie/lib/dayjs';
-import '@/mq';
 
 import { logger } from '@typie/lib';
 import { websocket } from 'hono/bun';

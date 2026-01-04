@@ -6,7 +6,6 @@ import { and, asc, desc, eq, gt, gte, inArray, isNotNull, lt, sql, sum } from 'd
 import { nanoid } from 'nanoid';
 import qs from 'query-string';
 import * as uuid from 'uuid';
-import { redis } from '@/cache';
 import {
   CreditCodes,
   db,
