@@ -26,7 +26,7 @@ export default defineConfig({
     sveltekit(),
   ],
   server: {
-    port: 4000,
-    strictPort: true,
+    port: 3000,
+    strictPort: false,
   },
 });
