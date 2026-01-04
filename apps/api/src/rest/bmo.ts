@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { Hono } from 'hono';
 import { env } from '@/env';
+import { enqueueJob } from '@/mq';
 import type { Env } from '@/context';
 
 type SlackAppMentionEvent = {

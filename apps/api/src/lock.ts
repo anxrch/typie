@@ -1,5 +1,54 @@
-import dedent from 'dedent';
 import { nanoid } from 'nanoid';
+
+type LockRecord = {
+  ownerId: string;
+  expiresAt: number;
+};
+
+const LOCK_TTL_MS = 30_000;
+const EXTEND_INTERVAL_MS = 10_000;
+const ACQUIRE_DEADLINE_MS = 30_000;
+const WAIT_SLICE_MS = 1000;
+
+const locks = new Map<string, LockRecord>();
+const waiters = new Map<string, Set<() => void>>();
+
+const notifyWaiters = (waitKey: string) => {
+  const set = waiters.get(waitKey);
+  if (!set) return;
+
+  for (const resolve of set) {
+    resolve();
+  }
+
+  waiters.delete(waitKey);
+};
+
+const waitForUnlock = (waitKey: string, ms: number) => {
+  return new Promise<void>((resolve) => {
+    const set = waiters.get(waitKey) ?? new Set<() => void>();
+
+    let done = false;
+
+    const finish = () => {
+      if (done) return;
+      done = true;
+
+      clearTimeout(timer);
+      set.delete(finish);
+      if (set.size === 0) {
+        waiters.delete(waitKey);
+      }
+
+      resolve();
+    };
+
+    set.add(finish);
+    waiters.set(waitKey, set);
+
+    const timer = setTimeout(finish, ms);
+  });
+};
 
 export class Lock {
   #id: string;
@@ -25,33 +74,35 @@ export class Lock {
   }
 
   async acquire() {
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + ACQUIRE_DEADLINE_MS;
 
     while (Date.now() < deadline) {
-      const acquired = await redis.set(this.#lockKey, this.#id, 'EX', 30, 'NX');
-      if (acquired === 'OK') {
+      const acquired = this.#tryAcquireOnce();
+      if (acquired) {
         this.#acquired = true;
         this.#start();
         return true;
       }
 
-      const remainingTime = Math.ceil((deadline - Date.now()) / 1000);
-      if (remainingTime <= 0) break;
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        break;
+      }
 
-      await redis.del(this.#waitKey);
-      await redis.blpop(this.#waitKey, Math.min(remainingTime, 1));
+      await waitForUnlock(this.#waitKey, Math.min(remaining, WAIT_SLICE_MS));
     }
 
     return false;
   }
 
   async tryAcquire() {
-    const acquired = await redis.set(this.#lockKey, this.#id, 'EX', 30, 'NX');
-    if (acquired === 'OK') {
+    const acquired = this.#tryAcquireOnce();
+    if (acquired) {
       this.#acquired = true;
       this.#start();
       return true;
     }
+
     return false;
   }
 
@@ -61,24 +112,37 @@ export class Lock {
     this.#stop();
     this.#controller.abort();
 
-    const script = dedent`
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        redis.call("del", KEYS[1])
-        redis.call("rpush", KEYS[2], "1")
-        return 1
-      else
-        return 0
-      end
-    `;
+    const record = locks.get(this.#lockKey);
 
-    const result = await redis.eval(script, 2, this.#lockKey, this.#waitKey, this.#id);
-
-    if (result === 1) {
+    if (!record || record.ownerId !== this.#id) {
       this.#acquired = false;
-      return true;
+      return false;
     }
 
-    return false;
+    locks.delete(this.#lockKey);
+    notifyWaiters(this.#waitKey);
+
+    this.#acquired = false;
+    return true;
+  }
+
+  #tryAcquireOnce() {
+    const record = locks.get(this.#lockKey);
+    if (record && record.expiresAt <= Date.now()) {
+      locks.delete(this.#lockKey);
+      notifyWaiters(this.#waitKey);
+    }
+
+    if (locks.has(this.#lockKey)) {
+      return false;
+    }
+
+    locks.set(this.#lockKey, {
+      ownerId: this.#id,
+      expiresAt: Date.now() + LOCK_TTL_MS,
+    });
+
+    return true;
   }
 
   #start() {
@@ -97,7 +161,7 @@ export class Lock {
         this.#acquired = false;
         this.#controller.abort();
       }
-    }, 10_000);
+    }, EXTEND_INTERVAL_MS);
 
     this.#timer.unref();
   }
@@ -112,16 +176,15 @@ export class Lock {
   async #extend() {
     if (!this.#acquired) return false;
 
-    const script = dedent`
-      if redis.call("get", KEYS[1]) == ARGV[1] then
-        return redis.call("expire", KEYS[1], ARGV[2])
-      else
-        return 0
-      end
-    `;
+    const record = locks.get(this.#lockKey);
+    if (!record || record.ownerId !== this.#id) {
+      return false;
+    }
 
-    const result = await redis.eval(script, 1, this.#lockKey, this.#id, 30);
-    return result === 1;
+    record.expiresAt = Date.now() + LOCK_TTL_MS;
+    locks.set(this.#lockKey, record);
+
+    return true;
   }
 }
 

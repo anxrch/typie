@@ -7,6 +7,7 @@ import ky from 'ky';
 import pMap from 'p-map';
 import { rapidhash } from 'rapidhash-js';
 import { env } from '@/env';
+import { redis } from '@/redis';
 
 const errorTypes = [
   'no-error',
@@ -119,12 +120,6 @@ const spacingPattern = /\s{2,}/g;
 const wordPattern = /\b([A-Za-z][A-Za-z']+)\b/g;
 
 const memoryCache = new Map<string, string>();
-const memoryOnlyCache: CacheClient = {
-  get: async (key) => memoryCache.get(key) ?? null,
-  setex: async (key, _ttl, value) => {
-    memoryCache.set(key, value);
-  },
-};
 
 const buildOfflineErrors = (normalizedText: string): NormalizedError[] => {
   const errors: NormalizedError[] = [];
@@ -354,7 +349,7 @@ export const check = async (text: string, options: SpellcheckOptions = {}) => {
 
   if (!normalized.text.trim()) return [];
 
-  const cache = options.cache ?? redis ?? memoryOnlyCache;
+  const cache = options.cache ?? redis;
   const url = options.url ?? env.SPELLCHECK_URL;
   const apiKey = options.apiKey ?? env.SPELLCHECK_API_KEY;
   const offlineMode = shouldUseOffline(options, url, apiKey);
