@@ -1,6 +1,8 @@
 import { Menu, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 
 export const ssr = false;
+export const csr = true;
+export const prerender = false;
 
 export const load = async () => {
   const appMenu = await Submenu.new({
