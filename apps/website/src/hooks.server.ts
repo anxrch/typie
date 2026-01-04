@@ -3,17 +3,20 @@ import '@typie/lib/dayjs';
 
 import * as Sentry from '@sentry/sveltekit';
 import { sequence } from '@sveltejs/kit/hooks';
-import { logger, logging } from '@typie/lib/svelte';
+import { logger } from '@typie/lib/svelte';
 import { GlobalWindow } from 'happy-dom';
 import { env } from '$env/dynamic/public';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 
 globalThis.__happydom__ = { window: new GlobalWindow() };
 
-Sentry.init({
-  dsn: env.PUBLIC_SENTRY_DSN,
-  sendDefaultPii: true,
-});
+// 오프라인 모드에서는 Sentry 비활성화
+if (env.PUBLIC_SENTRY_DSN) {
+  Sentry.init({
+    dsn: env.PUBLIC_SENTRY_DSN,
+    sendDefaultPii: true,
+  });
+}
 
 const log = logger.getChild('http');
 
@@ -51,5 +54,6 @@ const errorHandler: HandleServerError = ({ error, status, message }) => {
   log.error('Server error {*}', { status, message, error });
 };
 
-export const handle = sequence(Sentry.sentryHandle(), logging, theme, header);
-export const handleError = Sentry.handleErrorWithSentry(errorHandler);
+// 오프라인 모드에서는 Sentry 및 logging 미들웨어 비활성화
+export const handle = sequence(theme, header);
+export const handleError = errorHandler;
