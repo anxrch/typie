@@ -28,6 +28,7 @@ import { dev, env } from '@/env';
 import { TypieError } from '@/errors';
 import * as aws from '@/external/aws';
 import { apple, google, kakao, naver } from '@/external/sso';
+import { redis } from '@/redis';
 import { generateFractionalOrder, generateRandomAvatar, generateRandomName, persistBlobAsImage } from '@/utils';
 import { createSite } from '@/utils/site';
 import { builder } from '../builder';

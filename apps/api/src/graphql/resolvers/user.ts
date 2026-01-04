@@ -52,6 +52,7 @@ import { env, stack } from '@/env';
 import { TypieError } from '@/errors';
 import * as aws from '@/external/aws';
 import * as portone from '@/external/portone';
+import { redis } from '@/redis';
 import { delay } from '@/utils/promise';
 import { getUserUsage } from '@/utils/user';
 import { redeemCodeSchema, userSchema } from '@/validation';

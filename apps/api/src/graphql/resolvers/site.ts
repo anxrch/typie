@@ -7,6 +7,7 @@ import { db, Entities, first, firstOrThrow, FontFamilies, Fonts, PostContents, P
 import { EntityState, EntityType, FontState } from '@/enums';
 import { env } from '@/env';
 import { TypieError } from '@/errors';
+import { pubsub } from '@/pubsub';
 import { generateRandomName } from '@/utils/name';
 import { assertSitePermission } from '@/utils/permission';
 import { siteSchema } from '@/validation';
@@ -215,19 +216,22 @@ builder.mutationFields((t) => ({
  * * Subscriptions
  */
 
+type SiteUpdateEvent = { scope: 'site' } | { scope: 'entity'; entityId: string };
+type SiteUsageUpdateEvent = null;
+
 builder.subscriptionFields((t) => ({
   siteUpdateStream: t.withAuth({ session: true }).field({
     type: t.builder.unionType('SiteUpdateStreamPayload', {
       types: [Site, Entity],
     }),
     args: { siteId: t.arg.id({ validate: validateDbId(TableCode.SITES) }) },
-    subscribe: async (_, args, ctx) => {
+    subscribe: async (_, args, ctx): Promise<AsyncIterable<SiteUpdateEvent>> => {
       await assertSitePermission({
         userId: ctx.session.userId,
         siteId: args.siteId,
       });
 
-      const repeater = pubsub.subscribe('site:update', args.siteId);
+      const repeater = pubsub.subscribe<SiteUpdateEvent>('site:update', args.siteId);
 
       ctx.c.req.raw.signal.addEventListener('abort', () => {
         repeater.return();
@@ -235,7 +239,7 @@ builder.subscriptionFields((t) => ({
 
       return repeater;
     },
-    resolve: async (payload, args, ctx) => {
+    resolve: async (payload: SiteUpdateEvent, args, ctx) => {
       clearLoaders(ctx);
 
       return match(payload)
@@ -248,13 +252,13 @@ builder.subscriptionFields((t) => ({
   siteUsageUpdateStream: t.withAuth({ session: true }).field({
     type: Site,
     args: { siteId: t.arg.id({ validate: validateDbId(TableCode.SITES) }) },
-    subscribe: async (_, args, ctx) => {
+    subscribe: async (_, args, ctx): Promise<AsyncIterable<SiteUsageUpdateEvent>> => {
       // await assertSitePermission({
       //   userId: ctx.session.userId,
       //   siteId: args.siteId,
       // });
 
-      const repeater = pubsub.subscribe('site:usage:update', args.siteId);
+      const repeater = pubsub.subscribe<SiteUsageUpdateEvent>('site:usage:update', args.siteId);
 
       ctx.c.req.raw.signal.addEventListener('abort', () => {
         repeater.return();
@@ -262,7 +266,7 @@ builder.subscriptionFields((t) => ({
 
       return repeater;
     },
-    resolve: async (_, args, ctx) => {
+    resolve: async (_payload: SiteUsageUpdateEvent, args, ctx) => {
       clearLoaders(ctx);
 
       return await db.select().from(Sites).where(eq(Sites.id, args.siteId)).then(firstOrThrow);

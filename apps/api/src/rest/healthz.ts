@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { db } from '@/db';
+import { redis } from '@/redis';
 import type { Env } from '@/context';
 
 export const healthz = new Hono<Env>();

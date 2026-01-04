@@ -9,6 +9,7 @@ import { nanoid } from 'nanoid';
 import qs from 'query-string';
 import { db, first, UserSessions } from '@/db';
 import { env } from '@/env';
+import { redis } from '@/redis';
 import { jwk, privateKey, publicKey } from '@/utils';
 import type { Env } from '@/context';
 

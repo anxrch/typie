@@ -19,6 +19,7 @@ import {
 import { SubscriptionState, UserState } from '@/enums';
 import { env } from '@/env';
 import * as aws from '@/external/aws';
+import { redis } from '@/redis';
 import { builder } from '../builder';
 
 builder.queryField('stats', (t) =>

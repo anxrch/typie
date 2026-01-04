@@ -8,6 +8,7 @@ import * as jose from 'jose';
 import { nanoid } from 'nanoid';
 import * as R from 'remeda';
 import { db, firstOrThrow, UserSessions } from '@/db';
+import { redis } from '@/redis';
 import { publicKey } from '@/utils';
 import type { Context as HonoContext } from 'hono';
 
