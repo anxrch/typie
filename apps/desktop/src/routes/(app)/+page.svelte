@@ -101,7 +101,11 @@
   });
 </script>
 
-<div class={flex({ width: '[100vw]', height: '[100vh]', backgroundColor: 'surface.subtle' })}>
+<div
+  class={flex({ width: '[100vw]', height: '[100vh]', backgroundColor: 'surface.subtle' })}
+  data-tauri-drag-region="false"
+  style="-webkit-app-region: no-drag;"
+>
   <aside
     class={flex({
       width: '280px',
@@ -113,6 +117,8 @@
       gap: '12px',
       backgroundColor: 'surface.default',
     })}
+    data-tauri-drag-region="false"
+    style="-webkit-app-region: no-drag;"
   >
     <div>
       <h1 class={css({ fontSize: '18px', fontWeight: 'bold', marginBottom: '4px' })}>오프라인 노트</h1>
@@ -139,7 +145,11 @@
       새 노트 만들기
     </button>
 
-    <div class={flex({ flexDirection: 'column', gap: '8px', overflowY: 'auto', flexGrow: '1' })}>
+    <div
+      class={flex({ flexDirection: 'column', gap: '8px', overflowY: 'auto', flexGrow: '1' })}
+      data-tauri-drag-region="false"
+      style="-webkit-app-region: no-drag;"
+    >
       {#if notes.length === 0 && !isLoading}
         <div class={css({ color: 'gray.600', fontSize: '13px' })}>아직 노트가 없어요.</div>
       {:else}
@@ -169,9 +179,17 @@
     </div>
   </aside>
 
-  <section class={flex({ flexDirection: 'column', flexGrow: '1', height: 'full', padding: '16px', gap: '12px' })}>
+  <section
+    class={flex({ flexDirection: 'column', flexGrow: '1', height: 'full', padding: '16px', gap: '12px' })}
+    data-tauri-drag-region="false"
+    style="-webkit-app-region: no-drag;"
+  >
     {#if selectedId}
-      <div class={flex({ justifyContent: 'space-between', alignItems: 'center', gap: '8px' })}>
+      <div
+        class={flex({ justifyContent: 'space-between', alignItems: 'center', gap: '8px' })}
+        data-tauri-drag-region="false"
+        style="-webkit-app-region: no-drag;"
+      >
         <input
           class={css({
             width: 'full',
@@ -237,7 +255,11 @@
         value={editorContent}
       ></textarea>
 
-      <div class={flex({ justifyContent: 'space-between', alignItems: 'center' })}>
+      <div
+        class={flex({ justifyContent: 'space-between', alignItems: 'center' })}
+        data-tauri-drag-region="false"
+        style="-webkit-app-region: no-drag;"
+      >
         <div class={css({ color: 'gray.600', fontSize: '13px' })}>변경 사항은 기기 안에 저장되며, 인터넷 없이도 계속 편집할 수 있어요.</div>
 
         <div class={flex({ gap: '8px' })}>
@@ -277,7 +299,11 @@
         </div>
       </div>
     {:else}
-      <div class={center({ flexDirection: 'column', gap: '12px', height: 'full' })}>
+      <div
+        class={center({ flexDirection: 'column', gap: '12px', height: 'full' })}
+        data-tauri-drag-region="false"
+        style="-webkit-app-region: no-drag;"
+      >
         <h2 class={css({ fontSize: '20px', fontWeight: 'bold' })}>불러올 노트가 없어요</h2>
         <p class={css({ color: 'gray.600', fontSize: '14px', textAlign: 'center' })}>새 노트를 만들어 오프라인으로 바로 작성해보세요.</p>
         <button
