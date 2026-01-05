@@ -9,6 +9,7 @@
     "core:default",
     "core:event:default",
     "core:menu:default",
+    "core:menu:allow-set-as-app-menu",
     "core:window:allow-start-dragging",
     "core:window:allow-hide",
     "deep-link:default",

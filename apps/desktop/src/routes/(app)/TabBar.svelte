@@ -43,6 +43,7 @@
     paddingRight: '8px',
     backgroundColor: 'surface.subtle',
   })}
+  style:-webkit-app-region="no-drag"
 >
   <div
     style:-webkit-app-region="drag"
@@ -52,6 +53,7 @@
 
   <div
     class={flex({ flexGrow: '1', gap: '4px', height: 'full', overflowX: 'scroll', scrollbarWidth: 'none' })}
+    style:-webkit-app-region="no-drag"
     data-tauri-drag-region="false"
     role="tablist"
   >
