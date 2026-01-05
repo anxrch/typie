@@ -102,7 +102,7 @@
 </script>
 
 <div
-  class={flex({ width: '[100vw]', height: '[100vh]', backgroundColor: 'surface.subtle' })}
+  class={flex({ width: '[100vw]', height: '[calc(100vh - var(--titlebar-height, 40px))]', backgroundColor: 'surface.subtle' })}
   data-tauri-drag-region="false"
   style="-webkit-app-region: no-drag;"
 >
