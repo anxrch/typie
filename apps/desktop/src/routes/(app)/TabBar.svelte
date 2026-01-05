@@ -35,21 +35,24 @@
 />
 
 <div
-  style:-webkit-app-region="drag"
   class={flex({
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: '8px',
     height: '40px',
     paddingY: '4px',
     paddingRight: '8px',
     backgroundColor: 'surface.subtle',
   })}
-  data-tauri-drag-region
 >
   <div
     style:-webkit-app-region="drag"
-    class={flex({ flexGrow: '1', gap: '4px', height: 'full', overflowX: 'scroll', scrollbarWidth: 'none' })}
+    class={css({ flexShrink: 0, width: '32px', height: 'full' })}
     data-tauri-drag-region
+  />
+
+  <div
+    class={flex({ flexGrow: '1', gap: '4px', height: 'full', overflowX: 'scroll', scrollbarWidth: 'none' })}
+    data-tauri-drag-region="false"
     role="tablist"
   >
     {#each tabState.tabs as tab (tab.id)}
@@ -79,6 +82,8 @@
             },
           }),
         )}
+        style:-webkit-app-region="no-drag"
+        data-tauri-drag-region="false"
         aria-selected={tab.active}
         onclick={() => tabState.switch(tab.id)}
         onkeydown={null}
@@ -97,6 +102,8 @@
               color: 'text.default',
             },
           })}
+          style:-webkit-app-region="no-drag"
+          data-tauri-drag-region="false"
         >
           {tab.title}
         </span>
@@ -117,6 +124,8 @@
                 color: 'text.default',
               },
             })}
+            style:-webkit-app-region="no-drag"
+            data-tauri-drag-region="false"
             onclick={() => tabState.remove(tab.id)}
             type="button"
           >
@@ -139,6 +148,8 @@
         color: 'text.default',
       },
     })}
+    style:-webkit-app-region="no-drag"
+    data-tauri-drag-region="false"
     onclick={() => tabState.add(Home, {})}
     type="button"
   >
