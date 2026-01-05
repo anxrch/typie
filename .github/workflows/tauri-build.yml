@@ -59,7 +59,8 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
-            patchelf
+            patchelf \
+            fonts-noto-cjk
 
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
