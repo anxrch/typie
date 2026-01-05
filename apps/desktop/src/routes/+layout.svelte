@@ -80,7 +80,7 @@
 
 <div
   data-tauri-drag-region="false"
-  style="-webkit-app-region: no-drag; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;"
+  style="-webkit-app-region: no-drag; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif; padding-top: var(--titlebar-height, 40px); box-sizing: border-box; --titlebar-height: 40px;"
 >
   {@render children()}
 </div>
